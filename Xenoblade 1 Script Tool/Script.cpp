@@ -192,6 +192,8 @@ void Script::initIDPool(unsigned char* memblock) {
 		}
 		this->IDPool.push_back(ID);
 	}
+
+	// for (string str : this->IDPool) cout << str << '\n';
 	
 }
 
@@ -249,7 +251,7 @@ void Script::initStringPool(unsigned char* memblock) {
 	if (stringStart % 4 != 0) cout << "Warning: decryption not aligned";
 	for (unsigned int i = stringStart; i < this->functionPoolOffset; i += 4) {
 		decryptBytes(memblock, i);
-		cout << hex << (int)memblock[i] << " " << (int)memblock[i + 1] << " " << (int)memblock[i + 2] << " " << (int)memblock[i + 3] << '\n';
+		// cout << hex << (int)memblock[i] << " " << (int)memblock[i + 1] << " " << (int)memblock[i + 2] << " " << (int)memblock[i + 3] << '\n';
 	}
 
 	// TODO: store string data into this->stringPool
@@ -484,8 +486,20 @@ void Script::decryptBytes(unsigned char* memblock, int start) {
 	unsigned char b2 = memblock[start + 2];
 	unsigned char b3 = memblock[start + 3];
 	
-	memblock[start] = (((b0 >> 2) & 0x3f) + ((b3 << 6) & 0xc0));
-	memblock[start + 1] = (((b1 >> 2) & 0x3f) + ((b0 << 6) & 0xc0));
-	memblock[start + 2] = (((b2 >> 2) & 0x3f) + (((b1 & 0x3) << 6) & 0xc0));
-	memblock[start + 3] = (((b3 >> 2) & 0x3f) + (((b2 & 0x3) << 6) & 0xc0));
+	memblock[start] =     (b0 >> 2) + (b3 << 6);
+	memblock[start + 1] = (b1 >> 2) + (b0 << 6);
+	memblock[start + 2] = (b2 >> 2) + (b1 << 6);
+	memblock[start + 3] = (b3 >> 2) + (b2 << 6);
+}
+
+void Script::encryptBytes(unsigned char* memblock, int start) {
+	unsigned char f0 = memblock[start];
+	unsigned char f1 = memblock[start + 1];
+	unsigned char f2 = memblock[start + 2];
+	unsigned char f3 = memblock[start + 3];
+	
+	memblock[start] =     (f0 << 2) + (f1 >> 6);
+	memblock[start + 1] = (f1 << 2) + (f2 >> 6);
+	memblock[start + 2] = (f2 << 2) + (f3 >> 6);
+	memblock[start + 3] = (f3 << 2) + (f0 >> 6);
 }

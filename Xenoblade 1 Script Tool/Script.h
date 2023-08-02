@@ -45,6 +45,7 @@ class Script
 	void initUserAttributePool(unsigned char* memblock);
 
 	void decryptBytes(unsigned char* memblock, int start);
+	void encryptBytes(unsigned char* memblock, int start);
 
 public:
 	Script(char* fileName);
