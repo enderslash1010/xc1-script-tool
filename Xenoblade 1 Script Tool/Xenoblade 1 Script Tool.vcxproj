@@ -104,6 +104,8 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -128,6 +130,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Function.cpp" />
+    <ClCompile Include="Instruction.cpp" />
+    <ClCompile Include="OpCode.cpp" />
     <ClCompile Include="PluginImport.cpp" />
     <ClCompile Include="Script.cpp" />
     <ClCompile Include="Object.cpp" />
@@ -135,6 +139,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Function.h" />
+    <ClInclude Include="Instruction.h" />
+    <ClInclude Include="OpCode.h" />
     <ClInclude Include="PluginImport.h" />
     <ClInclude Include="Script.h" />
     <ClInclude Include="Object.h" />
