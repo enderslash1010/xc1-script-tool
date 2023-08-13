@@ -1,13 +1,9 @@
 #pragma once
 #include "Script.h"
-#include <fstream>
-#include <string>
-#include <vector>
 #include "Function.h"
 #include "PluginImport.h"
 #include "Object.h"
-
-using namespace std;
+#include "Instruction.h"
 
 class Script
 {
@@ -18,16 +14,18 @@ class Script
 
 	bool littleEndian, is64Bit;
 
-	vector<string> IDPool, stringPool, OCImports, systemAttributePool, userAttributePool;
-	vector<int> intPool;
-	vector<float> fixedPool;
-	vector<Function> functionPool;
-	vector<PluginImport> pluginImports;
-	vector<Object> staticVariables;
-	vector<vector<Object>> localPool;
+	std::vector<std::string> IDPool, stringPool, OCImports, systemAttributePool, userAttributePool;
+	std::vector<int> intPool;
+	std::vector<float> fixedPool;
+	std::vector<Function> functionPool;
+	std::vector<PluginImport> pluginImports;
+	std::vector<Object> staticVariables;
+	std::vector<std::vector<Object>> localPool;
 
 	unsigned int getUInteger4(unsigned char* memblock, int start);
 	unsigned int getUInteger2(unsigned char* memblock, int start);
+	unsigned int getInteger2(unsigned char* memblock, int start);
+	unsigned int getInteger4(unsigned char* memblock, int start);
 	float getFloat(unsigned char* memblock, int start);
 
 	void initCode(unsigned char* memblock);
