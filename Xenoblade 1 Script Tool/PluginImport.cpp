@@ -1,20 +1,19 @@
+
 #include "PluginImport.h"
 #include <string>
 
-using namespace std;
-
-PluginImport::PluginImport(string pluginName, string functionName)
+PluginImport::PluginImport(std::string pluginName, std::string functionName)
 {
 	this->pluginName = pluginName;
-	this->funtionName = functionName;
+	this->functionName = functionName;
 }
 
-string PluginImport::getPluginName()
+std::string PluginImport::getPluginName()
 {
 	return this->pluginName;
 }
 
-string PluginImport::getFunctionName()
+std::string PluginImport::getFunctionName()
 {
-	return this->funtionName;
+	return this->functionName;
 }

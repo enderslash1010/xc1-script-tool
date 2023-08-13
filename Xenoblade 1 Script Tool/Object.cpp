@@ -1,9 +1,6 @@
 #include "Object.h"
-#include <string>
 
-using namespace std;
-
-Object::Object(string type, unsigned int length, unsigned int value, unsigned int field8)
+Object::Object(std::string type, unsigned int length, unsigned int value, unsigned int field8)
 {
 	this->type = type;
 	this->length = length;
@@ -11,7 +8,7 @@ Object::Object(string type, unsigned int length, unsigned int value, unsigned in
 	this->field8 = field8;
 }
 
-string Object::getType()
+std::string Object::getType()
 {
 	return this->type;
 }

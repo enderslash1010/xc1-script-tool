@@ -1,16 +1,14 @@
 #pragma once
 #include <string>
 
-using namespace std;
-
 class PluginImport
 {
-	string pluginName;
-	string funtionName;
+	std::string pluginName;
+	std::string functionName;
 
 public:
-	PluginImport(string pluginName, string functionName);
+	PluginImport(std::string pluginName, std::string functionName);
 
-	string getPluginName(), getFunctionName();
+	std::string getPluginName(), getFunctionName();
 };
 
