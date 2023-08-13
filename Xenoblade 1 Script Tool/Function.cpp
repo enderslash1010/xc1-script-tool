@@ -1,7 +1,7 @@
 #include "Function.h"
-#include <string>
+#include <iostream>
 
-Function::Function(string name, unsigned int field2, unsigned int field4, unsigned int field6, unsigned int localPoolIndex, unsigned int field10, unsigned int start, unsigned int end)
+Function::Function(std::string name, unsigned int field2, unsigned int field4, unsigned int field6, unsigned int localPoolIndex, unsigned int field10, unsigned int start, unsigned int end)
 {
 	this->name = name;
 	this->field2 = field2;
@@ -13,7 +13,17 @@ Function::Function(string name, unsigned int field2, unsigned int field4, unsign
 	this->end = end;
 }
 
-string Function::getName()
+void Function::addCode(std::vector<Instruction> code) 
+{
+	this->code = code;
+}
+
+std::vector<Instruction> Function::getCode() 
+{
+	return this->code;
+}
+
+std::string Function::getName()
 {
 	return this->name;
 }
