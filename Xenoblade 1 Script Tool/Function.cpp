@@ -1,10 +1,11 @@
 #include "Function.h"
 #include <iostream>
+#include <vector>
 
-Function::Function(std::string name, unsigned int field2, unsigned int field4, unsigned int field6, unsigned int localPoolIndex, unsigned int field10, unsigned int start, unsigned int end)
+Function::Function(std::string name, unsigned int args, unsigned int field4, unsigned int field6, unsigned int localPoolIndex, unsigned int field10, unsigned int start, unsigned int end)
 {
 	this->name = name;
-	this->field2 = field2;
+	this->args = args;
 	this->field4 = field4;
 	this->field6 = field6;
 	this->localPoolIndex = localPoolIndex;
@@ -28,9 +29,9 @@ std::string Function::getName()
 	return this->name;
 }
 
-unsigned int Function::getField2()
+unsigned int Function::getArgs()
 {
-	return this->field2;
+	return this->args;
 }
 
 unsigned int Function::getField4()
