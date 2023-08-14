@@ -3,7 +3,7 @@
 #include <string>
 #include <iostream>
 #include <vector>
-#include <unordered_map>
+#include <map>
 #include "Function.h"
 #include "Object.h"
 
@@ -156,12 +156,12 @@ Script::Script(char* fileName)
 	initIntPool(memblock);
 	initFixedPool(memblock);
 	initStringPool(memblock);
+	initLocalPool(memblock);
 	initFunctionPool(memblock);
 	initPluginImports(memblock);
 	initOCImports(memblock);
 	initFunctionImports(memblock);
 	initStaticVariables(memblock);
-	initLocalPool(memblock);
 	initSystemAttributePool(memblock);
 	initUserAttributePool(memblock);
 	initCode(memblock);
@@ -186,7 +186,7 @@ void Script::initCode(unsigned char *memblock) {
 				int numCases = memblock[pc++];
 				unsigned int defaultCase = getUInteger4(memblock, pc); pc += 4;
 
-				std::unordered_map<int, unsigned int> switchCases;
+				std::map<int, unsigned int> switchCases;
 				for (int i = 0; i < numCases; i++) {
 					int value = getInteger4(memblock, pc); pc += 4;
 					int jump = getInteger4(memblock, pc); pc += 4;
@@ -355,7 +355,7 @@ void Script::initStringPool(unsigned char* memblock) {
 		this->stringPool.push_back(str);
 	}
 
-	for (std::string str : this->stringPool) std::cout << str << '\n';
+	// for (std::string str : this->stringPool) std::cout << str << '\n';
 
 }
 
@@ -379,8 +379,7 @@ void Script::initFunctionPool(unsigned char* memblock) {
 		Function f(name, field2, field4, field6, localPoolIndex, field10, start, end);
 		this->functionPool.push_back(f);
 	}
-
-	// for (Function f : this->functionPool) cout << f.getName() << ": " << f.getStart() << ", " << f.getEnd() << '\n';
+	// for (Function f : this->functionPool) std::cout << f.getName() << ": " << f.getStart() << ", " << f.getEnd() << '\n';
 }
 
 void Script::initPluginImports(unsigned char* memblock) {
@@ -523,12 +522,12 @@ void Script::initLocalPool(unsigned char* memblock) {
 
 	/*
 	int index = 0;
-	for (vector<Object> v : this->localPool) {
-		cout << "Index " << index << ": " << '\n';
+	for (std::vector<Object> v : this->localPool) {
+		std::cout << "Index " << index << ": " << '\n';
 		for (Object o : v) {
-			cout << o.getType() << ", " << o.getLength() << ", " << o.getValue() << ", " << o.getField8() << '\n';
+			std::cout << o.getType() << ", " << o.getLength() << ", " << o.getValue() << ", " << o.getField8() << '\n';
 		}
-		cout << '\n';
+		std::cout << '\n';
 		index++;
 	}
 	*/
@@ -603,4 +602,109 @@ void Script::encryptBytes(unsigned char* memblock, int start) {
 	memblock[start + 1] = (f1 << 2) + (f2 >> 6);
 	memblock[start + 2] = (f2 << 2) + (f3 >> 6);
 	memblock[start + 3] = (f3 << 2) + (f0 >> 6);
+}
+
+void Script::generateOutfile(std::string name) {
+	std::ofstream outfile(name + ".csv");
+
+	// Function Pool (with Local Pool and Code)
+	outfile << "Function Pool:" << '\n';
+	for (Function f : this->functionPool) {
+		outfile << f.getName() << '\n';
+		outfile << "Start,End,Args, Field 4, Field 6\n";
+		outfile << f.getStart() << "," << f.getEnd() << "," << f.getArgs() << "," << f.getField4() << "," << f.getField6() << "\n\n";
+		if (f.getLocalPoolIndex() != 0xFFFF) {
+			outfile << "Local Pool:" << '\n' << "Type,Length,Value,Field 8\n";
+			std::vector<Object> localPool = this->localPool.at(f.getLocalPoolIndex());
+			for (Object o : localPool) {
+				outfile << o.getType() << "," << o.getLength() << "," << o.getValue() << "," << o.getField8() << '\n';
+			}
+			outfile << '\n';
+		}
+		outfile << "Opcode,Operand\n";
+		for (Instruction i : f.getCode()) {
+			if (i.getOperand() == -1) {
+				outfile << i.getOpCode().getOpCodeString() << '\n';
+			}
+			else if (i.getOpCode().getOpCodeVal() == OpCode::OpCodes::SWITCH) {
+				outfile << "SWITCH," << i.getOperand() << ",Case,Offset\n,,default," << i.getDefaultCase() << '\n';
+				std::map<int, unsigned int> switchCases = i.getSwitchCases();
+				for (auto it = switchCases.begin(); it != switchCases.end(); ++it) {
+					outfile << ",," << it->first << "," << it->second << '\n';
+				}
+			}
+			else {
+				outfile << i.getOpCode().getOpCodeString() << "," << i.getOperand() << '\n';
+			}
+		}
+
+		outfile << '\n';
+	}
+
+	// ID Pool
+	outfile << "ID Pool:\nIndex,Value\n";
+	for (int i = 0; i < this->IDPool.size(); i++) {
+		outfile << i << "," << this->IDPool.at(i) << '\n';
+	}
+	outfile << '\n';
+
+	// Int Pool
+	outfile << "Int Pool:\nIndex,Value\n";
+	for (int i = 0; i < this->intPool.size(); i++) {
+		outfile << i << "," << this->intPool.at(i) << '\n';
+	}
+	outfile << '\n';
+
+	// Fixed Pool
+	outfile << "Fixed Pool:\nIndex,Value\n";
+	for (int i = 0; i < this->fixedPool.size(); i++) {
+		outfile << i << "," << this->fixedPool.at(i) << '\n';
+	}
+	outfile << '\n';
+
+	// String Pool
+	outfile << "String Pool:\nIndex,Value\n";
+	for (int i = 0; i < this->stringPool.size(); i++) {
+		outfile << i << "," << this->stringPool.at(i) << '\n';
+	}
+	outfile << '\n';
+
+	// Static Vars
+	outfile << "Static Variables:\nIndex,Type,Length,Value,Field 8\n";
+	for (int i = 0; i < this->staticVariables.size(); i++) {
+		Object o = this->staticVariables.at(i);
+		outfile << i << "," << o.getType() << "," << o.getLength() << "," << o.getValue() << "," << o.getField8() << '\n';
+	}
+	outfile << '\n';
+
+	// Plugin Imports
+	outfile << "Plugin Imports:\nIndex,Plugin Name,Function\n";
+	for (int i = 0; i < this->pluginImports.size(); i++) {
+		PluginImport pi = this->pluginImports.at(i);
+		outfile << i << "," << pi.getPluginName() << "," << pi.getFunctionName() << '\n';
+	}
+	outfile << '\n';
+
+	// OC Imports
+	outfile << "OC Imports:\nIndex,Name\n";
+	for (int i = 0; i < this->OCImports.size(); i++) {
+		outfile << i << "," << this->OCImports.at(i) << '\n';
+	}
+	outfile << '\n';
+
+	// System Attribute Pool
+	outfile << "System Attribute Pool:\nIndex,Name\n";
+	for (int i = 0; i < this->systemAttributePool.size(); i++) {
+		outfile << i << "," << this->systemAttributePool.at(i) << '\n';
+	}
+	outfile << '\n';
+
+	// User Attribute Pool
+	outfile << "User Attribute Pool:\nIndex,Name\n";
+	for (int i = 0; i < this->userAttributePool.size(); i++) {
+		outfile << i << "," << this->userAttributePool.at(i) << '\n';
+	}
+	outfile << '\n';
+
+	outfile.close();
 }

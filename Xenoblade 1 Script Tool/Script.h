@@ -47,4 +47,5 @@ class Script
 
 public:
 	Script(char* fileName);
+	void generateOutfile(std::string name);
 };
