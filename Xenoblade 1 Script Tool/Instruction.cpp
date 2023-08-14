@@ -1,7 +1,7 @@
 #include "Instruction.h"
 #include "OpCode.h"
 #include <stdexcept>
-#include <unordered_map>
+#include <map>
 
 Instruction::Instruction(OpCode oc, unsigned int operand)
 {
@@ -22,7 +22,7 @@ Instruction::Instruction(OpCode oc)
 }
 
 // For switch instructions
-Instruction::Instruction(OpCode oc, unsigned int operand, std::unordered_map<int, unsigned int> switchCases, unsigned int defaultCase) {
+Instruction::Instruction(OpCode oc, unsigned int operand, std::map<int, unsigned int> switchCases, unsigned int defaultCase) {
     if (oc.getOpCodeVal() != OpCode::OpCodes::SWITCH) throw std::runtime_error("Expecting SWITCH Instruction, got " + oc.getOpCodeString());
     
     this->opCode = oc;
@@ -41,7 +41,7 @@ int Instruction::getOperand()
     return this->operand;
 }
 
-std::unordered_map<int, unsigned int> Instruction::getSwitchCases()
+std::map<int, unsigned int> Instruction::getSwitchCases()
 {
     if (this->getOpCode().getOpCodeVal() != OpCode::OpCodes::SWITCH) throw std::runtime_error("Cannot call getSwitchCases() on non-SWITCH Instruction");
     return this->switchCases;
