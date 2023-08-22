@@ -48,4 +48,20 @@ class Script
 public:
 	Script(char* fileName);
 	void generateOutfile(std::string name);
+	void generateScriptFile(std::string name);
+
+	int getIndexInIDPool(std::string ID);
+
+	std::vector<unsigned char> generateCodeSection();
+	std::vector<unsigned char> generateIntPoolSection();
+	std::vector<unsigned char> generateFixedPoolSection();
+	std::vector<unsigned char> generateStringSection(std::vector<std::string> input);
+	std::vector<unsigned char> generateFunctionPoolSection();
+	std::vector<unsigned char> generatePluginImportsSection();
+	std::vector<unsigned char> generateOCImportsSection();
+	std::vector<unsigned char> generateFunctionImportsSection();
+	std::vector<unsigned char> generateStaticVariablesSection();
+	std::vector<unsigned char> generateLocalPoolSection();
+	std::vector<unsigned char> generateSystemAttributesSection();
+	std::vector<unsigned char> generateUserAttributesSection();
 };

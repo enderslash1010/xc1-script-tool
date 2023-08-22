@@ -38,7 +38,6 @@ unsigned int Script::getUInteger4(unsigned char* memblock, int start) {
 	}
 	return result.uinteger;
 }
-
 unsigned int Script::getInteger4(unsigned char* memblock, int start) {
 	Integer4 result{};
 	if (this->littleEndian) { // Little Endian
@@ -49,7 +48,6 @@ unsigned int Script::getInteger4(unsigned char* memblock, int start) {
 	}
 	return result.integer;
 }
-
 unsigned int Script::getUInteger2(unsigned char* memblock, int start) {
 	UInteger2 result{};
 	if (this->littleEndian) { // Little Endian
@@ -60,7 +58,6 @@ unsigned int Script::getUInteger2(unsigned char* memblock, int start) {
 	}
 	return result.uinteger;
 }
-
 unsigned int Script::getInteger2(unsigned char* memblock, int start) {
 	Integer2 result{};
 	if (this->littleEndian) { // Little Endian
@@ -71,7 +68,6 @@ unsigned int Script::getInteger2(unsigned char* memblock, int start) {
 	}
 	return result.integer;
 }
-
 float Script::getFloat(unsigned char* memblock, int start) {
 	Float result{};
 	if (this->littleEndian) { // Little Endian
@@ -275,7 +271,7 @@ void Script::initIDPool(unsigned char* memblock) {
 		this->IDPool.push_back(ID);
 	}
 
-	// for (string str : this->IDPool) cout << str << '\n';
+	// for (std::string str : this->IDPool) std::cout << str << '\n';
 	
 }
 
@@ -376,7 +372,11 @@ void Script::initFunctionPool(unsigned char* memblock) {
 		unsigned int field10 = getUInteger2(memblock, pc+10);
 		unsigned int start = getUInteger4(memblock, pc+12);
 		unsigned int end = getUInteger4(memblock, pc+16);
-		Function f(name, field2, field4, field6, localPoolIndex, field10, start, end);
+
+		std::vector<Object> localPool;
+		if (localPoolIndex != 0xFFFF) localPool = this->localPool.at(localPoolIndex);
+
+		Function f(name, field2, field4, field6, localPool, localPoolIndex, field10, start, end);
 		this->functionPool.push_back(f);
 	}
 	// for (Function f : this->functionPool) std::cout << f.getName() << ": " << f.getStart() << ", " << f.getEnd() << '\n';
@@ -423,7 +423,6 @@ void Script::initFunctionImports(unsigned char* memblock) {
 	unsigned int count = getUInteger4(memblock, this->functionImportsOffset + 4);
 	unsigned int size = getUInteger4(memblock, this->functionImportsOffset + 8);
 
-	// TODO: represent function imports in an attribute array
 	// Note: xc1 doesn't use function imports in any of it's scripts, so we don't know how function imports are stored (most likely as indexes in ID Pool)
 }
 
@@ -435,21 +434,8 @@ void Script::initStaticVariables(unsigned char* memblock) {
 
 	// represent static objects in an attribute array
 	for (unsigned int i = 0; i < count; i++) {
-		std::string type = "";
-		switch (memblock[pc]) {
-		case 0: type = "Null"; break;
-		case 1: type = "True"; break;
-		case 2: type = "False"; break;
-		case 3: type = "Int"; break;
-		case 4: type = "Fixed"; break;
-		case 5: type = "String"; break;
-		case 6: type = "Array"; break;
-		case 7: type = "Function"; break;
-		case 8: type = "Plugin"; break;
-		case 9: type = "OC"; break;
-		case 10: type = "Sys"; break;
-		}
 
+		unsigned int type = memblock[pc];
 		unsigned int length = getUInteger2(memblock, pc + 2);
 		unsigned int value = getUInteger4(memblock, pc + 4);
 		unsigned int field8 = 0;
@@ -459,7 +445,7 @@ void Script::initStaticVariables(unsigned char* memblock) {
 		}
 		else pc += 8;
 
-		Object so(type, length, value, field8);
+		Object so((Object::Type) type, length, value, field8);
 		this->staticVariables.push_back(so);
 	}
 
@@ -490,21 +476,7 @@ void Script::initLocalPool(unsigned char* memblock) {
 
 		std::vector<Object> functionStack;
 		for (unsigned int j = 0; j < stackCount; j++) {
-			std::string type = "";
-			switch (memblock[stackDataOffset]) {
-			case 0: type = "Null"; break;
-			case 1: type = "True"; break;
-			case 2: type = "False"; break;
-			case 3: type = "Int"; break;
-			case 4: type = "Fixed"; break;
-			case 5: type = "String"; break;
-			case 6: type = "Array"; break;
-			case 7: type = "Function"; break;
-			case 8: type = "Plugin"; break;
-			case 9: type = "OC"; break;
-			case 10: type = "Sys"; break;
-			}
-
+			unsigned int type = memblock[stackDataOffset];
 			unsigned int length = getUInteger2(memblock, stackDataOffset + 2);
 			unsigned int value = getUInteger4(memblock, stackDataOffset + 4);
 			unsigned int field8 = 0;
@@ -514,7 +486,7 @@ void Script::initLocalPool(unsigned char* memblock) {
 			}
 			else stackDataOffset += 8;
 
-			Object so(type, length, value, field8);
+			Object so((Object::Type) type, length, value, field8);
 			functionStack.push_back(so);
 		}
 		this->localPool.push_back(functionStack);
@@ -613,10 +585,9 @@ void Script::generateOutfile(std::string name) {
 		outfile << f.getName() << '\n';
 		outfile << "Start,End,Args, Field 4, Field 6\n";
 		outfile << f.getStart() << "," << f.getEnd() << "," << f.getArgs() << "," << f.getField4() << "," << f.getField6() << "\n\n";
-		if (f.getLocalPoolIndex() != 0xFFFF) {
+		if (f.getLocalPool().size() != 0) {
 			outfile << "Local Pool:" << '\n' << "Type,Length,Value,Field 8\n";
-			std::vector<Object> localPool = this->localPool.at(f.getLocalPoolIndex());
-			for (Object o : localPool) {
+			for (Object o : f.getLocalPool()) {
 				outfile << o.getType() << "," << o.getLength() << "," << o.getValue() << "," << o.getField8() << '\n';
 			}
 			outfile << '\n';
@@ -707,4 +678,391 @@ void Script::generateOutfile(std::string name) {
 	outfile << '\n';
 
 	outfile.close();
+}
+
+void addValueToVector(std::vector<unsigned char>& vector, unsigned int numBytes, int value) {
+	for (int i = numBytes - 1; i >= 0; i--) vector.push_back(value >> (i * 8));
+}
+void addValueToVectorStart(std::vector<unsigned char>& vector, unsigned int numBytes, int value) {
+	for (int i = 0; i < numBytes; i++) vector.insert(vector.begin(), value >> (i * 8));
+}
+
+void addHeaderOffset(std::vector<unsigned char>& script, int& currOffset, std::vector<unsigned char>& section) {
+	addValueToVector(script, 4, currOffset);
+	currOffset += section.size();
+}
+
+void Script::generateScriptFile(std::string name) {
+	// Make new script file name.sb
+	std::ofstream script(name + ".sb", std::ios::trunc | std::ios::binary);
+
+	// Generate script file data from the data in the vector arrays
+	// Code section
+	std::vector<unsigned char> codeSection = this->generateCodeSection();
+
+	// ID Pool section
+	std::vector<unsigned char> IDPoolSection = this->generateStringSection(this->IDPool);
+
+	// Int Pool section
+	std::vector<unsigned char> intPoolSection = this->generateIntPoolSection();
+
+	// Fixed Pool section
+	std::vector<unsigned char> fixedPoolSection = this->generateFixedPoolSection();
+
+	// String Pool section
+	std::vector<unsigned char> stringPoolSection = this->generateStringSection(this->stringPool);
+
+	// Local Pool section
+	std::vector<unsigned char> localPoolSection = this->generateLocalPoolSection();
+
+	// Function Pool section
+	std::vector<unsigned char> functionPoolSection = this->generateFunctionPoolSection();
+
+	// Plugin Imports section
+	std::vector<unsigned char> pluginImportsSection = this->generatePluginImportsSection();
+
+	// OC Imports section
+	std::vector<unsigned char> OCImportsSection = this->generateOCImportsSection();
+
+	// Function Imports section
+	std::vector<unsigned char> functionImportsSection = this->generateFunctionImportsSection();
+
+	// Static Variables section
+	std::vector<unsigned char> staticVarsSection = this->generateStaticVariablesSection();
+
+	// System Attributes Pool section
+	std::vector<unsigned char> systemAttributesSection = this->generateSystemAttributesSection();
+
+	// User Attribute Pool section
+	std::vector<unsigned char> userAttributesSection = this->generateUserAttributesSection();
+
+	// Create header and append all sections
+	std::vector<unsigned char> header;
+	header.insert(header.end(), {0x53, 0x42, 0x20, 0x20}); // file magic
+	header.insert(header.end(), {this->version, 0});
+	header.push_back(this->flags);
+	header.push_back(this->isLoaded);
+
+	int currOffset = 0x40; // size of header
+	addHeaderOffset(header, currOffset, codeSection);
+	addHeaderOffset(header, currOffset, IDPoolSection);
+	addHeaderOffset(header, currOffset, intPoolSection);
+	addHeaderOffset(header, currOffset, fixedPoolSection);
+	addHeaderOffset(header, currOffset, stringPoolSection);
+	addHeaderOffset(header, currOffset, functionPoolSection);
+	addHeaderOffset(header, currOffset, pluginImportsSection);
+	addHeaderOffset(header, currOffset, OCImportsSection);
+	addHeaderOffset(header, currOffset, functionImportsSection);
+	addHeaderOffset(header, currOffset, staticVarsSection);
+	addHeaderOffset(header, currOffset, localPoolSection);
+	addHeaderOffset(header, currOffset, systemAttributesSection);
+	addHeaderOffset(header, currOffset, userAttributesSection);
+	header.insert(header.end(), { 0, 0, 0, 0 }); // debug symbols offset
+
+	script.write((char*)header.data(), header.size());
+	script.write((char*)codeSection.data(), codeSection.size());
+	script.write((char*)IDPoolSection.data(), IDPoolSection.size());
+	script.write((char*)intPoolSection.data(), intPoolSection.size());
+	script.write((char*)fixedPoolSection.data(), fixedPoolSection.size());
+	script.write((char*)stringPoolSection.data(), stringPoolSection.size());
+	script.write((char*)functionPoolSection.data(), functionPoolSection.size());
+	script.write((char*)pluginImportsSection.data(), pluginImportsSection.size());
+	script.write((char*)OCImportsSection.data(), OCImportsSection.size());
+	script.write((char*)functionImportsSection.data(), functionImportsSection.size());
+	script.write((char*)staticVarsSection.data(), staticVarsSection.size());
+	script.write((char*)localPoolSection.data(), localPoolSection.size());
+	script.write((char*)systemAttributesSection.data(), systemAttributesSection.size());
+	script.write((char*)userAttributesSection.data(), userAttributesSection.size());
+
+	// pad to nearest 16 (the actual script files pad even more)
+	int fileSize = header.size() + codeSection.size() + IDPoolSection.size() + intPoolSection.size() + fixedPoolSection.size() + stringPoolSection.size() + functionPoolSection.size() + pluginImportsSection.size()
+		+ OCImportsSection.size() + functionImportsSection.size() + staticVarsSection.size() + localPoolSection.size() + systemAttributesSection.size() + userAttributesSection.size();
+	
+	for (int i = 0; i < 16 - (fileSize & 0xF); i++) {
+		script << (unsigned char)0x0;
+	}
+	
+	script.close();
+}
+
+int Script::getIndexInIDPool(std::string ID) {
+	for (int j = 0; j < this->IDPool.size(); j++) {
+		std::string str = this->IDPool.at(j);
+		if (strcmp(str.c_str(), ID.c_str()) == 0) return j;
+	}
+	return -1;
+}
+
+std::vector<unsigned char> Script::generateCodeSection() {
+	std::vector<unsigned char> code;
+
+	// Add _main_ function separately, since it's spacer values are different
+	code.push_back(0x5E); // spacer for _main_
+	std::vector<unsigned char> _main_ = this->functionPool.at(0).getRawCode();
+	code.insert(code.end(), _main_.begin(), _main_.end());
+	code.push_back(0x5E); // spacer for _main_
+
+	for (int i = 1; i < this->functionPool.size(); i++) {
+		Function& f = this->functionPool.at(i);
+		std::vector<unsigned char> funcCode = f.getRawCode();
+		code.insert(code.end(), funcCode.begin(), funcCode.end());
+		code.push_back(0x4B); // spacer
+	}
+	while (code.size() % 4 != 0) code.push_back(0x5E); // make sure code is aligned
+
+	// Add Section Header
+	unsigned int codeSize = code.size();
+
+
+	addValueToVectorStart(code, 4, code.size()); // Size of code in bytes
+	addValueToVectorStart(code, 4, 0); // Blank field
+	addValueToVectorStart(code, 4, 0xC); // Offset to code data, always 0xC since header is fixed size
+
+	return code;
+}
+std::vector<unsigned char> Script::generateIntPoolSection() {
+	std::vector<unsigned char> intPool;
+
+	for (int i : this->intPool) {
+		Integer4 int4;
+		int4.integer = i;
+		if (this->littleEndian) {
+			for (int j = 3; j >= 0; j--) intPool.push_back(int4.bytes[j]);
+		}
+		else {
+			for (int j = 0; j < 4; j++) intPool.push_back(int4.bytes[j]);
+		}
+	}
+
+	// add section header
+	addValueToVectorStart(intPool, 4, this->intPool.size()); // number of ints in int pool
+	addValueToVectorStart(intPool, 4, 8); // Offset to int array is always 8
+
+	return intPool;
+}
+std::vector<unsigned char> Script::generateFixedPoolSection() {
+	std::vector<unsigned char> fixedPool;
+
+	for (float f : this->fixedPool) {
+		Float afloat;
+		afloat.f = f;
+		if (this->littleEndian) {
+			for (int j = 3; j >= 0; j--) fixedPool.push_back(afloat.bytes[j]);
+		}
+		else {
+			for (int j = 0; j < 4; j++) fixedPool.push_back(afloat.bytes[j]);
+		}
+	}
+
+	// add section header
+	addValueToVectorStart(fixedPool, 4, this->fixedPool.size()); // number of floats in fixed pool
+	addValueToVectorStart(fixedPool, 4, 8); // Offset to float array is always 8
+
+	return fixedPool;
+}
+std::vector<unsigned char> Script::generateStringSection(std::vector<std::string> input) {
+	std::vector<unsigned char> stringPool;
+	unsigned int offsetElementSize = 2; // the minimum is 2 bytes
+	unsigned int numStrings = input.size();
+
+	unsigned short* offsetArr = new unsigned short[numStrings];
+	std::vector<unsigned char> stringData;
+
+	// Populates offsetArr and stringData
+	unsigned short currOffset = numStrings * offsetElementSize;
+	for (int i = 0; i < numStrings; i++) {
+		offsetArr[i] = currOffset;
+		currOffset += strlen(input.at(i).c_str()) + 1; // strlen doesn't include null terminator byte, so need to add 1
+
+		for (char c : input.at(i)) stringData.push_back(c);
+		stringData.push_back(0); // null terminator
+	}
+
+	// pad stringData to be a multiple of 4
+	while (stringData.size() % 4 != 0) stringData.push_back(0);
+
+	// encrypt string data
+	for (int i = 0; i < stringData.size(); i += 4) encryptBytes(stringData.data(), i);
+
+	// Add offset array and ID data to IDPool vector
+	for (int i = 0; i < numStrings; i++) {
+		addValueToVector(stringPool, offsetElementSize, offsetArr[i]);
+	}
+	stringPool.insert(stringPool.end(), stringData.begin(), stringData.end());
+
+	// add section header
+	addValueToVectorStart(stringPool, 4, offsetElementSize); // Size in bytes of elements in offset array
+	addValueToVectorStart(stringPool, 4, numStrings); // number of strings in section
+	addValueToVectorStart(stringPool, 4, 0xC); // Offset to code data, always 0xC since header is fixed size
+
+	return stringPool;
+}
+std::vector<unsigned char> Script::generateFunctionPoolSection() {
+	std::vector<unsigned char> functionPool;
+
+	// Create and populate an array of function data
+	std::vector<unsigned char> functionData;
+	for (int i = 0; i < this->functionPool.size(); i++) {
+		Function func = this->functionPool.at(i);
+
+		// Get index in ID Pool for function name
+		int nameIndex = getIndexInIDPool(func.getName());
+		if (nameIndex == -1) throw std::runtime_error("Function name " + func.getName() + " is not in ID Pool");
+		
+		addValueToVector(functionData, 2, nameIndex);
+		addValueToVector(functionData, 2, func.getArgs());
+		addValueToVector(functionData, 2, func.getField4());
+		addValueToVector(functionData, 2, func.getField6());
+		addValueToVector(functionData, 2, func.getLocalPoolIndex());
+		addValueToVector(functionData, 2, func.getField10());
+		addValueToVector(functionData, 4, func.getStart());
+		addValueToVector(functionData, 4, func.getEnd());
+	}
+
+	addValueToVector(functionPool, 4, 0xC); // offset to function data is always 0xC
+	addValueToVector(functionPool, 4, this->functionPool.size()); // add number of functions
+	addValueToVector(functionPool, 4, 0x14); // size of function data is always 0x14
+	functionPool.insert(functionPool.end(), functionData.begin(), functionData.end());
+
+	return functionPool;
+}
+std::vector<unsigned char> Script::generatePluginImportsSection() {
+	std::vector<unsigned char> pluginImports;
+
+	for (PluginImport pi : this->pluginImports) {
+		int pluginIndex = getIndexInIDPool(pi.getPluginName());
+		int functionIndex = getIndexInIDPool(pi.getFunctionName());
+		if (pluginIndex == -1) throw std::runtime_error("Plugin name " + pi.getPluginName() + " is not in ID Pool");
+		if (functionIndex == -1) throw std::runtime_error("Function name " + pi.getPluginName() + " is not in ID Pool");
+
+		addValueToVector(pluginImports, 2, pluginIndex);
+		addValueToVector(pluginImports, 2, functionIndex);
+	}
+
+	addValueToVectorStart(pluginImports, 4, 4);
+	addValueToVectorStart(pluginImports, 4, this->pluginImports.size());
+	addValueToVectorStart(pluginImports, 4, 0xC);
+
+	return pluginImports;
+}
+std::vector<unsigned char> Script::generateOCImportsSection() {
+	std::vector<unsigned char> OCImports;
+
+	for (std::string OC : this->OCImports) {
+		int OCIndex = getIndexInIDPool(OC);
+		if (OCIndex == -1) throw std::runtime_error("OC Import " + OC + " is not in ID Pool");
+		addValueToVector(OCImports, 2, OCIndex);
+	}
+
+	// pad to multiple of 4
+	while (OCImports.size() % 4 != 0) OCImports.push_back(0);
+
+	addValueToVectorStart(OCImports, 4, 2); // size in bytes of elements
+	addValueToVectorStart(OCImports, 4, this->OCImports.size()); // number of OC Imports
+	addValueToVectorStart(OCImports, 4, 0xC); // offset to data is always 0xC
+
+	return OCImports;
+}
+std::vector<unsigned char> Script::generateFunctionImportsSection() {
+	std::vector<unsigned char> functionImports;
+
+	// Note: no xb1 scripts have function imports
+	addValueToVector(functionImports, 4, 0xC); // offset to data 
+	addValueToVector(functionImports, 4, 0); // number of function imports
+	addValueToVector(functionImports, 4, 4); // size of function import
+
+	return functionImports;
+}
+std::vector<unsigned char> Script::generateStaticVariablesSection() {
+	std::vector<unsigned char> staticVariables;
+
+	for (Object o : this->staticVariables) {
+		addValueToVector(staticVariables, 1, o.getTypeEnum());
+		staticVariables.push_back(0);
+		addValueToVector(staticVariables, 2, o.getLength());
+		addValueToVector(staticVariables, 4, o.getValue());
+		if (this->is64Bit) addValueToVector(staticVariables, 4, o.getField8());
+	}
+
+	addValueToVectorStart(staticVariables, 4, this->staticVariables.size()); // number of static vars
+	addValueToVectorStart(staticVariables, 4, 8); // offset to static vars
+
+	return staticVariables;
+}
+std::vector<unsigned char> Script::generateLocalPoolSection() {
+	std::vector<unsigned char> localPool;
+
+	std::vector<int> offsetArr;
+	std::vector<unsigned char> localData;
+
+	unsigned int currIndex = 0;
+	unsigned int currOffset = 0;
+	for (Function & f : this->functionPool) {
+		if (f.getLocalPool().size() == 0) continue; // skip functions with no local pool
+
+		offsetArr.push_back(currOffset);
+		addValueToVector(localData, 4, 8); // offset to local object is always 8
+		addValueToVector(localData, 4, f.getLocalPool().size()); // local pool size
+		currOffset += 8;
+		for (Object o : f.getLocalPool()) {
+			addValueToVector(localData, 1, o.getTypeEnum());
+			localData.push_back(0);
+			addValueToVector(localData, 2, o.getLength());
+			addValueToVector(localData, 4, o.getValue());
+			if (this->is64Bit) {
+				addValueToVector(localData, 4, o.getField8());
+				currOffset += 12;
+			}
+			else currOffset += 8;
+		}
+
+		f.setLocalPoolIndex(currIndex++); // store local pool index in function, to generate the function pool later
+	}
+
+	addValueToVector(localPool, 4, 0xC); // offset to data is always 0xC
+	addValueToVector(localPool, 4, offsetArr.size()); // number of elements in offset array
+	addValueToVector(localPool, 4, 2); // size in bytes of elements in offset array
+
+	// add offsetArr.size()*offsetNumBytes to each index, and add to localPool
+	unsigned int offsetNumBytes = 2;
+	for (int c : offsetArr) {
+		addValueToVector(localPool, offsetNumBytes, c + (offsetArr.size() * offsetNumBytes));
+	}
+
+	// append localData to localPool
+	localPool.insert(localPool.end(), localData.begin(), localData.end());
+
+	// padding
+	while (localPool.size() % 4 != 0) localPool.push_back(0);
+
+	return localPool;
+}
+std::vector<unsigned char> Script::generateSystemAttributesSection() {
+	std::vector<unsigned char> systemAttributes;
+
+	addValueToVector(systemAttributes, 4, 0xC); // offset to data
+	addValueToVector(systemAttributes, 4, this->systemAttributePool.size()); // number of elements in array
+	addValueToVector(systemAttributes, 4, 2); // size in bytes of elements in array
+
+	for (std::string str : this->systemAttributePool) {
+		if (strcmp(str.c_str(), "") == 0) {
+			addValueToVector(systemAttributes, 2, 0xFFFF);
+			continue;
+		}
+
+		int index = getIndexInIDPool(str);
+		if (index == -1) throw std::runtime_error("System Attribute " + str + " is not in ID Pool");
+		addValueToVector(systemAttributes, 2, index);
+	}
+
+	return systemAttributes;
+}
+std::vector<unsigned char> Script::generateUserAttributesSection() {
+	std::vector<unsigned char> userAttributes;
+
+	addValueToVector(userAttributes, 4, 0xC);
+	addValueToVector(userAttributes, 4, this->userAttributePool.size());
+	addValueToVector(userAttributes, 4, 4);
+
+	return userAttributes;
 }
