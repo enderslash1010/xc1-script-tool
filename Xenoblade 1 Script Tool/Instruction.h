@@ -1,5 +1,6 @@
 #pragma once
 #include "OpCode.h"
+#include <vector>
 #include <map>
 
 class Instruction
@@ -15,6 +16,8 @@ public:
 
     std::map<int, unsigned int> getSwitchCases();
     unsigned int getDefaultCase();
+
+    std::vector<unsigned char> getRawInstruction();
 
     private:
         OpCode opCode;
