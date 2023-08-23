@@ -13,7 +13,7 @@ public:
 	OpCode(std::string opcode);
 	OpCode() = default;
 
-    static const enum OpCodes {
+    const enum OpCodes {
         NOP,
         CONST_0,
         CONST_1,
