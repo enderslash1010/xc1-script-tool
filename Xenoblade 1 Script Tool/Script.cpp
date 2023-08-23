@@ -436,6 +436,8 @@ void Script::initStaticVariables(unsigned char* memblock) {
 	for (unsigned int i = 0; i < count; i++) {
 
 		unsigned int type = memblock[pc];
+		unsigned char arrayFlag = memblock[pc + 1];
+		bool inArray = arrayFlag == 0xB5 ? true : false;
 		unsigned int length = getUInteger2(memblock, pc + 2);
 		unsigned int value = getUInteger4(memblock, pc + 4);
 		unsigned int field8 = 0;
@@ -445,7 +447,7 @@ void Script::initStaticVariables(unsigned char* memblock) {
 		}
 		else pc += 8;
 
-		Object so((Object::Type) type, length, value, field8);
+		Object so((Object::Type) type, inArray, length, value, field8);
 		this->staticVariables.push_back(so);
 	}
 
@@ -477,6 +479,8 @@ void Script::initLocalPool(unsigned char* memblock) {
 		std::vector<Object> functionStack;
 		for (unsigned int j = 0; j < stackCount; j++) {
 			unsigned int type = memblock[stackDataOffset];
+			unsigned char arrayFlag = memblock[stackDataOffset + 1];
+			bool inArray = arrayFlag == 0xB5 ? true : false;
 			unsigned int length = getUInteger2(memblock, stackDataOffset + 2);
 			unsigned int value = getUInteger4(memblock, stackDataOffset + 4);
 			unsigned int field8 = 0;
@@ -486,7 +490,7 @@ void Script::initLocalPool(unsigned char* memblock) {
 			}
 			else stackDataOffset += 8;
 
-			Object so((Object::Type) type, length, value, field8);
+			Object so((Object::Type) type, inArray, length, value, field8);
 			functionStack.push_back(so);
 		}
 		this->localPool.push_back(functionStack);
@@ -862,16 +866,16 @@ std::vector<unsigned char> Script::generateFixedPoolSection() {
 }
 std::vector<unsigned char> Script::generateStringSection(std::vector<std::string> input) {
 	std::vector<unsigned char> stringPool;
-	unsigned int offsetElementSize = 2; // the minimum is 2 bytes
+
 	unsigned int numStrings = input.size();
 
-	unsigned short* offsetArr = new unsigned short[numStrings];
+	std::vector<int> offsetArr;
 	std::vector<unsigned char> stringData;
 
 	// Populates offsetArr and stringData
-	unsigned short currOffset = numStrings * offsetElementSize;
+	int currOffset = 0;
 	for (int i = 0; i < numStrings; i++) {
-		offsetArr[i] = currOffset;
+		offsetArr.push_back(currOffset);
 		currOffset += strlen(input.at(i).c_str()) + 1; // strlen doesn't include null terminator byte, so need to add 1
 
 		for (char c : input.at(i)) stringData.push_back(c);
@@ -885,8 +889,10 @@ std::vector<unsigned char> Script::generateStringSection(std::vector<std::string
 	for (int i = 0; i < stringData.size(); i += 4) encryptBytes(stringData.data(), i);
 
 	// Add offset array and ID data to IDPool vector
-	for (int i = 0; i < numStrings; i++) {
-		addValueToVector(stringPool, offsetElementSize, offsetArr[i]);
+	unsigned int offsetElementSize = 2;
+	if ((offsetArr.at(offsetArr.size() - 1) + (offsetArr.size() * offsetElementSize)) > 0xFFFF) offsetElementSize = 4;
+	for (int c : offsetArr) {
+		addValueToVector(stringPool, offsetElementSize, c + (offsetArr.size() * offsetElementSize));
 	}
 	stringPool.insert(stringPool.end(), stringData.begin(), stringData.end());
 
@@ -997,7 +1003,7 @@ std::vector<unsigned char> Script::generateLocalPoolSection() {
 
 	unsigned int currIndex = 0;
 	unsigned int currOffset = 0;
-	for (Function & f : this->functionPool) {
+	for (Function& f : this->functionPool) {
 		if (f.getLocalPool().size() == 0) continue; // skip functions with no local pool
 
 		offsetArr.push_back(currOffset);
@@ -1006,9 +1012,14 @@ std::vector<unsigned char> Script::generateLocalPoolSection() {
 		currOffset += 8;
 		for (Object o : f.getLocalPool()) {
 			addValueToVector(localData, 1, o.getTypeEnum());
-			localData.push_back(0);
+
+			// if local var is in an array, this byte is B5 for some reason
+			if (o.isInArray()) localData.push_back(0xB5);
+			else localData.push_back(0);
+
 			addValueToVector(localData, 2, o.getLength());
 			addValueToVector(localData, 4, o.getValue());
+
 			if (this->is64Bit) {
 				addValueToVector(localData, 4, o.getField8());
 				currOffset += 12;
@@ -1019,20 +1030,29 @@ std::vector<unsigned char> Script::generateLocalPoolSection() {
 		f.setLocalPoolIndex(currIndex++); // store local pool index in function, to generate the function pool later
 	}
 
+	unsigned int extraBytes = (offsetArr.size() * 2) % 4; // Assume offsetNumBytes is 2 here; if offsetNumBytes needs to be 4, then we don't need any extra bytes
+
+	unsigned int offsetNumBytes = 2;
+	if ((offsetArr.at(offsetArr.size() - 1) + (offsetArr.size() * offsetNumBytes) + (extraBytes * offsetNumBytes)) > 0xFFFF) offsetNumBytes = 4;
+
 	addValueToVector(localPool, 4, 0xC); // offset to data is always 0xC
 	addValueToVector(localPool, 4, offsetArr.size()); // number of elements in offset array
-	addValueToVector(localPool, 4, 2); // size in bytes of elements in offset array
+	addValueToVector(localPool, 4, offsetNumBytes); // size in bytes of elements in offset array
 
 	// add offsetArr.size()*offsetNumBytes to each index, and add to localPool
-	unsigned int offsetNumBytes = 2;
-	for (int c : offsetArr) {
-		addValueToVector(localPool, offsetNumBytes, c + (offsetArr.size() * offsetNumBytes));
+	if (offsetNumBytes == 2) {
+		for (int c : offsetArr) addValueToVector(localPool, offsetNumBytes, c + (offsetArr.size() * offsetNumBytes) + extraBytes); // need to add extra padding bytes to offsetArr elements
+		// add extra padding bytes
+		for (int i = 0; i < extraBytes; i++) localPool.push_back(0);
+	}
+	else {
+		for (int c : offsetArr) addValueToVector(localPool, offsetNumBytes, c + (offsetArr.size() * offsetNumBytes)); // no need to add extra padding bytes to offsets here, since it will always be a multiple of 4
 	}
 
 	// append localData to localPool
 	localPool.insert(localPool.end(), localData.begin(), localData.end());
 
-	// padding
+	// padding at the end
 	while (localPool.size() % 4 != 0) localPool.push_back(0);
 
 	return localPool;
