@@ -79,10 +79,10 @@ float Script::getFloat(unsigned char* memblock, int start) {
 	return result.f;
 }
 
-Script::Script(char* fileName) 
+Script::Script(std::string fileName) 
 {
 	std::ifstream buffer(fileName, std::ios::binary | std::ios::ate);
-	if (!buffer.is_open()) throw std::runtime_error("Unable to open file");
+	if (!buffer.is_open()) throw std::runtime_error("Unable to open file " + fileName);
 
 	// Load buffer into char array
 	int size = buffer.tellg();
@@ -99,54 +99,54 @@ Script::Script(char* fileName)
 	this->littleEndian = *(char*)&n == 1 ? true : false;
 
 	this->version = memblock[0x4];
-	std::cout << "Version: 0x" << (int) this->version << '\n';
+	//std::cout << "Version: 0x" << (int) this->version << '\n';
 
 	this->flags = memblock[0x6];
-	std::cout << std::hex << "Flags: 0x" << (int) this->flags << '\n';
+	//std::cout << std::hex << "Flags: 0x" << (int) this->flags << '\n';
 	this->is64Bit = (this->flags & 4) != 0;
-	std::cout << "64 Bit: " << this->is64Bit << '\n';
+	//std::cout << "64 Bit: " << this->is64Bit << '\n';
 
 	this->isLoaded = memblock[0x7];
-	std::cout << std::hex << "isLoaded: 0x" << (int) this->isLoaded << '\n';
+	//std::cout << std::hex << "isLoaded: 0x" << (int) this->isLoaded << '\n';
 
 	this->codeOffset = getUInteger4(memblock, 8);
-	std::cout << std::hex << "Code Offset: 0x" << this->codeOffset << '\n';
+	//std::cout << std::hex << "Code Offset: 0x" << this->codeOffset << '\n';
 
 	this->IDPoolOffset = getUInteger4(memblock, 12);
-	std::cout << std::hex << "ID Pool Offset: 0x" << this->IDPoolOffset << '\n';
+	//std::cout << std::hex << "ID Pool Offset: 0x" << this->IDPoolOffset << '\n';
 
 	this->intPoolOffset = getUInteger4(memblock, 16);
-	std::cout << std::hex << "Int Pool Offset: 0x" << this->intPoolOffset << '\n';
+	//std::cout << std::hex << "Int Pool Offset: 0x" << this->intPoolOffset << '\n';
 
 	this->fixedPoolOffset = getUInteger4(memblock, 20);
-	std::cout << std::hex << "Fixed Pool Offset: 0x" << this->fixedPoolOffset << '\n';
+	//std::cout << std::hex << "Fixed Pool Offset: 0x" << this->fixedPoolOffset << '\n';
 
 	this->stringPoolOffset = getUInteger4(memblock, 24);
-	std::cout << std::hex << "String Pool Offset: 0x" << this->stringPoolOffset << '\n';
+	//std::cout << std::hex << "String Pool Offset: 0x" << this->stringPoolOffset << '\n';
 
 	this->functionPoolOffset = getUInteger4(memblock, 28);
-	std::cout << std::hex << "Function Pool Offset: 0x" << this->functionPoolOffset << '\n';
+	//std::cout << std::hex << "Function Pool Offset: 0x" << this->functionPoolOffset << '\n';
 
 	this->pluginImportsOffset = getUInteger4(memblock, 32);
-	std::cout << std::hex << "Plugin Imports Offset: 0x" << this->pluginImportsOffset << '\n';
+	//std::cout << std::hex << "Plugin Imports Offset: 0x" << this->pluginImportsOffset << '\n';
 
 	this->OCImportsOffset = getUInteger4(memblock, 36);
-	std::cout << std::hex << "OC Imports Offset: 0x" << this->OCImportsOffset << '\n';
+	//std::cout << std::hex << "OC Imports Offset: 0x" << this->OCImportsOffset << '\n';
 
 	this->functionImportsOffset = getUInteger4(memblock, 40);
-	std::cout << std::hex << "Function Imports Offset: 0x" << this->functionImportsOffset << '\n';
+	//std::cout << std::hex << "Function Imports Offset: 0x" << this->functionImportsOffset << '\n';
 
 	this->staticVariablesOffset = getUInteger4(memblock, 44);
-	std::cout << std::hex << "Static Variables Offset: 0x" << this->staticVariablesOffset << '\n';
+	//std::cout << std::hex << "Static Variables Offset: 0x" << this->staticVariablesOffset << '\n';
 
 	this->localPoolOffset = getUInteger4(memblock, 48);
-	std::cout << std::hex << "Local Pool Offset: 0x" << this->localPoolOffset << '\n';
+	//std::cout << std::hex << "Local Pool Offset: 0x" << this->localPoolOffset << '\n';
 
 	this->systemAttributePoolOffset = getUInteger4(memblock, 52);
-	std::cout << std::hex << "System Attribute Pool Offset: 0x" << this->systemAttributePoolOffset << '\n';
+	//std::cout << std::hex << "System Attribute Pool Offset: 0x" << this->systemAttributePoolOffset << '\n';
 
 	this->userAttributePoolOffset = getUInteger4(memblock, 56);
-	std::cout << std::hex << "User Attribute Pool Offset: 0x" << this->userAttributePoolOffset << '\n';
+	//std::cout << std::hex << "User Attribute Pool Offset: 0x" << this->userAttributePoolOffset << '\n';
 
 	initIDPool(memblock);
 	initIntPool(memblock);
@@ -246,7 +246,6 @@ void Script::initIDPool(unsigned char* memblock) {
 	stringStart += arrStart;
 
 	// Decrypt string data
-	if (stringStart % 4 != 0) std::cout << "Warning: decryption not aligned";
 	for (unsigned int i = stringStart; i < this->intPoolOffset; i+=4) {
 		decryptBytes(memblock, i);
 	}
@@ -326,7 +325,6 @@ void Script::initStringPool(unsigned char* memblock) {
 	stringStart += arrStart;
 
 	// Decrypt string data
-	if (stringStart % 4 != 0) std::cout << "Warning: decryption not aligned";
 	for (unsigned int i = stringStart; i < this->functionPoolOffset; i += 4) {
 		decryptBytes(memblock, i);
 	}
@@ -803,8 +801,10 @@ std::vector<unsigned char> Script::generateCodeSection() {
 	// Add _main_ function separately, since it's spacer values are different
 	code.push_back(0x5E); // spacer for _main_
 	std::vector<unsigned char> _main_ = this->functionPool.at(0).getRawCode();
-	code.insert(code.end(), _main_.begin(), _main_.end());
-	code.push_back(0x5E); // spacer for _main_
+	if (_main_.size() != 0) {
+		code.insert(code.end(), _main_.begin(), _main_.end());
+		code.push_back(0x5E); // spacer for _main_
+	}
 
 	for (int i = 1; i < this->functionPool.size(); i++) {
 		Function& f = this->functionPool.at(i);
@@ -812,13 +812,12 @@ std::vector<unsigned char> Script::generateCodeSection() {
 		code.insert(code.end(), funcCode.begin(), funcCode.end());
 		code.push_back(0x4B); // spacer
 	}
-	while (code.size() % 4 != 0) code.push_back(0x5E); // make sure code is aligned
+	while (code.size() % 4 != 0) code.push_back(0x0); // make sure code is aligned
 
 	// Add Section Header
-	unsigned int codeSize = code.size();
+	unsigned int codeSize = _main_.size() == 0 ? 1 : code.size();
 
-
-	addValueToVectorStart(code, 4, code.size()); // Size of code in bytes
+	addValueToVectorStart(code, 4, codeSize); // Size of code in bytes
 	addValueToVectorStart(code, 4, 0); // Blank field
 	addValueToVectorStart(code, 4, 0xC); // Offset to code data, always 0xC since header is fixed size
 
@@ -890,7 +889,7 @@ std::vector<unsigned char> Script::generateStringSection(std::vector<std::string
 
 	// Add offset array and ID data to IDPool vector
 	unsigned int offsetElementSize = 2;
-	if ((offsetArr.at(offsetArr.size() - 1) + (offsetArr.size() * offsetElementSize)) > 0xFFFF) offsetElementSize = 4;
+	if (offsetArr.size() != 0 && (offsetArr.at(offsetArr.size() - 1) + (offsetArr.size() * offsetElementSize)) > 0xFFFF) offsetElementSize = 4;
 	for (int c : offsetArr) {
 		addValueToVector(stringPool, offsetElementSize, c + (offsetArr.size() * offsetElementSize));
 	}
@@ -1033,7 +1032,7 @@ std::vector<unsigned char> Script::generateLocalPoolSection() {
 	unsigned int extraBytes = (offsetArr.size() * 2) % 4; // Assume offsetNumBytes is 2 here; if offsetNumBytes needs to be 4, then we don't need any extra bytes
 
 	unsigned int offsetNumBytes = 2;
-	if ((offsetArr.at(offsetArr.size() - 1) + (offsetArr.size() * offsetNumBytes) + (extraBytes * offsetNumBytes)) > 0xFFFF) offsetNumBytes = 4;
+	if (offsetArr.size() != 0 && (offsetArr.at(offsetArr.size() - 1) + (offsetArr.size() * offsetNumBytes) + (extraBytes * offsetNumBytes)) > 0xFFFF) offsetNumBytes = 4;
 
 	addValueToVector(localPool, 4, 0xC); // offset to data is always 0xC
 	addValueToVector(localPool, 4, offsetArr.size()); // number of elements in offset array

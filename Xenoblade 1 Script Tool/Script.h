@@ -46,7 +46,7 @@ class Script
 	void encryptBytes(unsigned char* memblock, int start);
 
 public:
-	Script(char* fileName);
+	Script(std::string fileName);
 	void generateOutfile(std::string name);
 	void generateScriptFile(std::string name);
 
