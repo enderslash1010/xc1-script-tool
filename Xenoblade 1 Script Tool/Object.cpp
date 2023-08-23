@@ -1,6 +1,6 @@
 #include "Object.h"
 
-Object::Object(Object::Type type, unsigned int length, unsigned int value, unsigned int field8)
+Object::Object(Object::Type type, bool inArray, unsigned int length, unsigned int value, unsigned int field8)
 {
 	this->typeEnum = type;
 	switch (this->typeEnum) {
@@ -18,6 +18,7 @@ Object::Object(Object::Type type, unsigned int length, unsigned int value, unsig
 	}
 
 	this->length = length;
+	this->inArray = inArray;
 	this->value = value;
 	this->field8 = field8;
 }
@@ -45,4 +46,9 @@ unsigned int Object::getValue()
 unsigned int Object::getField8()
 {
 	return this->field8;
+}
+
+bool Object::isInArray()
+{
+	return this->inArray;
 }
