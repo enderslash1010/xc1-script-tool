@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <map>
+#include <regex>
 #include "Function.h"
 #include "Object.h"
 
@@ -79,8 +80,13 @@ float Script::getFloat(unsigned char* memblock, int start) {
 	return result.f;
 }
 
-Script::Script(std::string fileName) 
+Script::Script(std::string fileName, bool isScript) 
 {
+	if (isScript) initScript(fileName);
+	else initCSV(fileName);
+}
+
+void Script::initScript(std::string fileName) {
 	std::ifstream buffer(fileName, std::ios::binary | std::ios::ate);
 	if (!buffer.is_open()) throw std::runtime_error("Unable to open file " + fileName);
 
@@ -88,12 +94,12 @@ Script::Script(std::string fileName)
 	int size = buffer.tellg();
 	unsigned char* memblock = new unsigned char[size];
 	buffer.seekg(0, std::ios::beg);
-	buffer.read((char*) memblock, size);
+	buffer.read((char*)memblock, size);
 	buffer.close();
 
 	// Check file type
 	if (size < 63 || memblock[0x0] != 0x53 || memblock[0x1] != 0x42 || memblock[0x2] != 0x20 || memblock[0x3] != 0x20) throw std::runtime_error("Wrong file type");
-	
+
 	// Check Endianness
 	int n = 1;
 	this->littleEndian = *(char*)&n == 1 ? true : false;
@@ -161,6 +167,281 @@ Script::Script(std::string fileName)
 	initSystemAttributePool(memblock);
 	initUserAttributePool(memblock);
 	initCode(memblock);
+}
+
+std::vector<std::string> split(std::string str, std::string delim = ",") {
+	std::vector<std::string> result;
+	int start, end = -1 * delim.size();
+	do {
+		start = end + delim.size();
+		end = str.find(delim, start);
+		result.push_back(str.substr(start, end - start));
+	} while (end != -1);
+	return result;
+}
+
+void Script::initCSV(std::string fileName) {
+	// TODO: make sure file has extension .csv
+	
+	// Open file
+	std::ifstream csvFile(fileName);
+	if (!csvFile.is_open()) throw std::runtime_error("Unable to open file " + fileName);
+	
+	// Read contents of file into vector or something
+	std::vector<std::string> lines;
+	while (csvFile.good()) {
+		std::string str;
+		std::getline(csvFile, str, '\n');
+		lines.push_back(str);
+	}
+
+	// Find Function Pool
+	int currIndex = -1;
+	for (int i = 0; i < lines.size(); i++) {
+		if (std::regex_match(lines[i], std::regex("Function Pool:(,*)"))) {
+			currIndex = i + 1;
+			break;
+		}
+	}
+	if (currIndex == -1) throw std::runtime_error("Function Pool is missing");
+
+	// parse .csv data in lines to attribute vectors
+	initCSVFunctionPool(lines, currIndex);
+	initCSVIDPool(lines, currIndex);
+	initCSVIntPool(lines, currIndex);
+	initCSVFixedPool(lines, currIndex);
+	initCSVStringPool(lines, currIndex);
+	initCSVStaticVariables(lines, currIndex);
+	initCSVPluginImports(lines, currIndex);
+	initCSVOCImports(lines, currIndex);
+	initCSVSystemAttributes(lines, currIndex);
+	initCSVUserAttributes(lines, currIndex);
+}
+
+void Script::initCSVFunctionPool(std::vector<std::string> lines, int& currIndex) {
+
+	while (true) {
+		if (std::regex_match(lines[currIndex], std::regex("ID Pool:(,*)"))) break; // Stop when next section (ID Pool) is reached
+		std::string functionName = lines[currIndex];
+
+		if (!std::regex_match(lines[currIndex + 1], std::regex("Args,Field 4,Field 6,Field 10(,*)"))) throw std::runtime_error("Invalid attribute header for function " + functionName);
+		std::vector<std::string> argVals = split(lines[currIndex + 2]);
+		if (argVals.size() < 4) throw std::runtime_error("Invalid attributes for function " + functionName);
+		unsigned int args = std::stoi(argVals[0]);
+		unsigned int field4 = std::stoi(argVals[1]);
+		unsigned int field6 = std::stoi(argVals[2]);
+		unsigned int field10 = std::stoi(argVals[3]);
+
+		currIndex += 4; // Go to local pool header if present, otherwise it goes to code instruction header 
+
+		// read local pool if present
+		std::vector<Object> localPool;
+		if (std::regex_match(lines[currIndex], std::regex("Local Pool:(,*)"))) {
+			if (!std::regex_match(lines[currIndex + 1], std::regex("Type,inArray,Length,Value,Field 8(,*)"))) throw std::runtime_error("Invalid Local Pool header for function " + functionName);
+			currIndex += 2; // Go to local pool entries
+			while (!std::regex_match(lines[currIndex], std::regex(",*"))) {
+				// parse local pool entries
+				std::vector<std::string> localEntryStr = split(lines[currIndex]);
+				if (localEntryStr.size() < 5) throw std::runtime_error("Invalid Local Pool entry in function " + functionName);
+				std::string type = localEntryStr[0];
+				bool inArray = std::stoi(localEntryStr[1]) == 1 ? true : false;
+				unsigned int length = std::stoi(localEntryStr[2]);
+				int value = std::stoi(localEntryStr[3]);
+				unsigned int field8 = std::stoi(localEntryStr[4]);
+
+				localPool.push_back(Object(type, inArray, length, value, field8));
+				currIndex++;
+			}
+			currIndex++;
+		}
+
+		if (!std::regex_match(lines[currIndex], std::regex("Opcode,Operand(,*)"))) throw std::runtime_error("Invalid code section header for function " + functionName);
+		currIndex++; // Go to instruction list
+
+		// parse code into vector
+		std::vector<Instruction> code;
+		while (!std::regex_match(lines[currIndex], std::regex(",*"))) {
+			std::vector<std::string> instructionStr = split(lines[currIndex]);
+			std::string opcode = instructionStr[0];
+
+			if (strcmp("SWITCH", opcode.c_str()) == 0) { // handle SWITCH Instruction
+				if (instructionStr.size() < 4) throw std::runtime_error("Invalid SWITCH Instruction in function " + functionName);
+				if (strcmp("Case", instructionStr[2].c_str()) != 0 || strcmp("Offset", instructionStr[3].c_str()) != 0) throw std::runtime_error("Invalid SWITCH case/offset header in function " + functionName);
+				unsigned int numCases = std::stoi(instructionStr[1]);
+
+				// Get default case
+				std::vector<std::string> defaultStr = split(lines[currIndex + 1]);
+				if (defaultStr.size() < 4 || strcmp(defaultStr[2].c_str(), "default") != 0) throw std::runtime_error("Invalid default case in SWITCH Instruction in function " + functionName);
+				unsigned int defaultCase = std::stoi(defaultStr[3]);
+				currIndex += 2;
+
+				// Get all other cases
+				std::map<int, unsigned int> switchCases;
+				for (int i = 0; i < numCases; i++) {
+					std::vector<std::string> caseStr = split(lines[currIndex]);
+					if (caseStr.size() < 4) throw std::runtime_error("Invalid case in SWITCH Instruction in function " + functionName);
+					if (strcmp(caseStr[0].c_str(), "") != 0 || strcmp(caseStr[1].c_str(), "") != 0) throw std::runtime_error("SWITCH Instruction cases terminated early (check that SWITCH operand = number of cases)");
+					int caseVal = std::stoi(caseStr[2]);
+					int offset = std::stoi(caseStr[3]);
+					switchCases.insert({ caseVal , offset });
+					currIndex++;
+				}
+
+				// Make sure there are no other cases
+				if (lines.size() > currIndex && std::regex_match(lines[currIndex], std::regex(",,([^,]*,[^,]*)(.*)"))) throw std::runtime_error("SWITCH Instruction has more cases than specified (check that SWITCH operand = number of cases)");
+				currIndex--;
+			}
+			else { // Handle Non-SWITCH Instruction
+				switch (OpCode::getOperandSize(opcode)) {
+				case 0:
+					code.push_back(Instruction(opcode));
+					break;
+				case 1:
+				case 2:
+					if (instructionStr.size() < 2) throw std::runtime_error("Instruction " + opcode + " needs an operand");
+					code.push_back(Instruction(opcode, std::stoi(instructionStr[1])));
+					break;
+				}
+			}
+			currIndex++;
+		}
+
+		// Add function to this->functionPool, and add Local Pool to this->localPool if there is one
+		if (localPool.size() != 0) {
+			this->functionPool.push_back(Function(functionName, args, field4, field6, localPool, this->localPool.size(), field10, -1, -1)); // -1 are for attributes determined when generating a script
+			this->localPool.push_back(localPool);
+		}
+		else {
+			this->functionPool.push_back(Function(functionName, args, field4, field6, localPool, 0xFFFF, field10, -1, -1)); // -1 are for attributes determined when generating a script
+		}
+		currIndex++;
+	}
+}
+
+void Script::initCSVIDPool(std::vector<std::string> lines, int& currIndex) {
+	// currIndex is at "ID Pool:" here
+	if (!std::regex_match(lines[++currIndex], std::regex("Index,Value(,*)"))) throw std::runtime_error("Invalid ID Pool header");
+	currIndex++; // Go to 0th index
+	while (true) {
+		if (std::regex_match(lines[currIndex], std::regex("(,*)"))) break; // Check if it's the end of the section
+		std::vector<std::string> IDStr = split(lines[currIndex]);
+		if (IDStr.size() < 2) throw std::runtime_error("Invalid ID Pool entry at index " + this->IDPool.size()); // Validate entry
+		this->IDPool.push_back(IDStr[1]); // Push ID to this->IDPool
+		currIndex++; // Go to next ID Pool entry
+	}
+	currIndex++; // Go to next section (Int Pool)
+}
+
+void Script::initCSVIntPool(std::vector<std::string> lines, int& currIndex) {
+	// currIndex is at "Int Pool:" here
+	if (!std::regex_match(lines[currIndex++], std::regex("Int Pool:(,*)"))) throw std::runtime_error("Missing \"Int Pool:\" after ID Pool");
+	if (!std::regex_match(lines[currIndex++], std::regex("Index,Value(,*)"))) throw std::runtime_error("Invalid Int Pool header");
+	while (true) {
+		if (std::regex_match(lines[currIndex], std::regex("(,*)"))) break; // Check if it's the end of the section
+		std::vector<std::string> IntStr = split(lines[currIndex]);
+		if (IntStr.size() < 2) throw std::runtime_error("Invalid Int Pool entry at index " + this->intPool.size()); // Validate entry
+		this->intPool.push_back(std::stoi(IntStr[1])); // Push ID to this->IntPool
+		currIndex++; // Go to next Int Pool entry
+	}
+	currIndex++; // Go to next section (Fixed Pool)
+}
+
+void Script::initCSVFixedPool(std::vector<std::string> lines, int& currIndex) {
+	// currIndex is at "Fixed Pool:" here
+	if (!std::regex_match(lines[currIndex++], std::regex("Fixed Pool:(,*)"))) throw std::runtime_error("Missing \"Fixed Pool:\" after Int Pool");
+	if (!std::regex_match(lines[currIndex++], std::regex("Index,Value(,*)"))) throw std::runtime_error("Invalid Fixed Pool header");
+	while (true) {
+		if (std::regex_match(lines[currIndex], std::regex("(,*)"))) break; // Check if it's the end of the section
+		std::vector<std::string> fixedStr = split(lines[currIndex]);
+		if (fixedStr.size() < 2) throw std::runtime_error("Invalid Fixed Pool entry at index " + this->fixedPool.size()); // Validate entry
+		this->fixedPool.push_back(std::stof(fixedStr[1])); // Push to this->fixedPool
+		currIndex++; // Go to next fixed Pool entry
+	}
+	currIndex++; // Go to next section (String Pool)
+}
+
+void Script::initCSVStringPool(std::vector<std::string> lines, int& currIndex) {
+	// currIndex is at "String Pool:" here
+	if (!std::regex_match(lines[currIndex++], std::regex("String Pool:(,*)"))) throw std::runtime_error("Missing \"String Pool:\" after Fixed Pool");
+	if (!std::regex_match(lines[currIndex++], std::regex("Index,Value(,*)"))) throw std::runtime_error("Invalid String Pool header");
+	while (true) {
+		if (std::regex_match(lines[currIndex], std::regex("(,*)"))) break; // Check if it's the end of the section
+		std::vector<std::string> str = split(lines[currIndex]);
+		if (str.size() < 2) throw std::runtime_error("Invalid String Pool entry at index " + this->stringPool.size()); // Validate entry
+		this->stringPool.push_back(str[1]); // Push to this->stringPool
+		currIndex++; // Go to next String Pool entry
+	}
+	currIndex++; // Go to next section (Static variables)
+}
+
+void Script::initCSVStaticVariables(std::vector<std::string> lines, int& currIndex) {
+	// currIndex is at "Static Variables:" here
+	if (!std::regex_match(lines[currIndex++], std::regex("Static Variables:(,*)"))) throw std::runtime_error("Missing \"Static Variables:\" after String Pool");
+	if (!std::regex_match(lines[currIndex++], std::regex("Index,Type,inArray,Length,Value,Field 8(,*)"))) throw std::runtime_error("Invalid Static Variables header");
+	while (true) {
+		if (std::regex_match(lines[currIndex], std::regex("(,*)"))) break; // Check if it's the end of the section
+		std::vector<std::string> staticVar = split(lines[currIndex]);
+		if (staticVar.size() < 6) throw std::runtime_error("Static Variable at index " + this->staticVariables.size()); // Validate entry
+		this->staticVariables.push_back(Object(staticVar[1], staticVar[2] == "1" ? true : false, std::stoi(staticVar[3]), std::stoi(staticVar[4]), std::stoi(staticVar[5]))); // Push to this->staticVariables
+		currIndex++; // Go to next Static Variable
+	}
+	currIndex++; // Go to next section (Plugin Imports)
+}
+
+void Script::initCSVPluginImports(std::vector<std::string> lines, int& currIndex) {
+	// currIndex is at "Plugin Imports:"
+	if (!std::regex_match(lines[currIndex++], std::regex("Plugin Imports:(,*)"))) throw std::runtime_error("Missing \"Plugin Imports:\" after Static Variables");
+	if (!std::regex_match(lines[currIndex++], std::regex("Index,Plugin Name,Function(,*)"))) throw std::runtime_error("Invalid Plugin Imports header");
+	while (true) {
+		if (std::regex_match(lines[currIndex], std::regex("(,*)"))) break; // Check if it's the end of the section
+		std::vector<std::string> plugin = split(lines[currIndex]);
+		if (plugin.size() < 3) throw std::runtime_error("Invalid Plugin Import at index " + this->pluginImports.size()); // Validate entry
+		this->pluginImports.push_back(PluginImport(plugin[1], plugin[2]));
+		currIndex++; // Go to next Plugin Import
+	}
+	currIndex++; // Go to next section (OC Imports)
+}
+
+void Script::initCSVOCImports(std::vector<std::string> lines, int& currIndex) {
+	// currIndex is at "OC Imports:"
+	if (!std::regex_match(lines[currIndex++], std::regex("OC Imports:(,*)"))) throw std::runtime_error("Missing \"OC Imports:\" after Plugin Imports");
+	if (!std::regex_match(lines[currIndex++], std::regex("Index,Name(,*)"))) throw std::runtime_error("Invalid OC Imports header");
+	while (true) {
+		if (std::regex_match(lines[currIndex], std::regex("(,*)"))) break; // Check if it's the end of the section
+		std::vector<std::string> oc = split(lines[currIndex]);
+		if (oc.size() < 2) throw std::runtime_error("Invalid OC Import at index " + this->OCImports.size()); // Validate entry
+		this->OCImports.push_back(oc[1]);
+		currIndex++; // Go to next OC Import
+	}
+	currIndex++; // Go to next section (System Attributes)
+}
+
+void Script::initCSVSystemAttributes(std::vector<std::string> lines, int& currIndex) {
+	// currIndex is at "System Attribute Pool:"
+	if (!std::regex_match(lines[currIndex++], std::regex("System Attribute Pool:(,*)"))) throw std::runtime_error("Missing \"System Attribute Pool:\" after OC Imports");
+	if (!std::regex_match(lines[currIndex++], std::regex("Index,Name(,*)"))) throw std::runtime_error("Invalid System Attribute Pool header");
+	while (true) {
+		if (std::regex_match(lines[currIndex], std::regex("(,*)"))) break; // Check if it's the end of the section
+		std::vector<std::string> sysAttr = split(lines[currIndex]);
+		if (sysAttr.size() < 2) throw std::runtime_error("Invalid System Attribute at index " + this->systemAttributePool.size()); // Validate entry
+		this->systemAttributePool.push_back(sysAttr[1]);
+		currIndex++; // Go to next System Attribute
+	}
+	currIndex++; // Go to next section (User Attributes)
+}
+
+void Script::initCSVUserAttributes(std::vector<std::string> lines, int& currIndex) {
+	// currIndex is at "User Attribute Pool:"
+	if (!std::regex_match(lines[currIndex++], std::regex("User Attribute Pool:(,*)"))) throw std::runtime_error("Missing \"User Attribute Pool:\" after System Attribute Pool");
+	if (!std::regex_match(lines[currIndex++], std::regex("Index,Name(,*)"))) throw std::runtime_error("Invalid User Attribute Pool header");
+	while (true) {
+		if (std::regex_match(lines[currIndex], std::regex("(,*)"))) break; // Check if it's the end of the section
+		std::vector<std::string> userAttr = split(lines[currIndex]);
+		if (userAttr.size() < 2) throw std::runtime_error("Invalid User Attribute at index " + this->userAttributePool.size()); // Validate entry
+		this->userAttributePool.push_back(userAttr[1]);
+		currIndex++; // Go to next System Attribute
+	}
+	currIndex++; // Go to next section (User Attributes)
 }
 
 void Script::initCode(unsigned char *memblock) {
@@ -585,12 +866,12 @@ void Script::generateOutfile(std::string name) {
 	outfile << "Function Pool:" << '\n';
 	for (Function f : this->functionPool) {
 		outfile << f.getName() << '\n';
-		outfile << "Start,End,Args, Field 4, Field 6\n";
-		outfile << f.getStart() << "," << f.getEnd() << "," << f.getArgs() << "," << f.getField4() << "," << f.getField6() << "\n\n";
+		outfile << "Args,Field 4,Field 6,Field 10\n";
+		outfile << f.getArgs() << "," << f.getField4() << "," << f.getField6() << "," << f.getField10() << "\n\n";
 		if (f.getLocalPool().size() != 0) {
-			outfile << "Local Pool:" << '\n' << "Type,Length,Value,Field 8\n";
+			outfile << "Local Pool:" << '\n' << "Type,inArray,Length,Value,Field 8\n";
 			for (Object o : f.getLocalPool()) {
-				outfile << o.getType() << "," << o.getLength() << "," << o.getValue() << "," << o.getField8() << '\n';
+				outfile << o.getType() << "," << o.isInArray() << "," << o.getLength() << "," << o.getValue() << "," << o.getField8() << '\n';
 			}
 			outfile << '\n';
 		}
@@ -643,10 +924,10 @@ void Script::generateOutfile(std::string name) {
 	outfile << '\n';
 
 	// Static Vars
-	outfile << "Static Variables:\nIndex,Type,Length,Value,Field 8\n";
+	outfile << "Static Variables:\nIndex,Type,inArray,Length,Value,Field 8\n";
 	for (int i = 0; i < this->staticVariables.size(); i++) {
 		Object o = this->staticVariables.at(i);
-		outfile << i << "," << o.getType() << "," << o.getLength() << "," << o.getValue() << "," << o.getField8() << '\n';
+		outfile << i << "," << o.getType() << "," << o.isInArray() << "," << o.getLength() << "," << o.getValue() << "," << o.getField8() << '\n';
 	}
 	outfile << '\n';
 
