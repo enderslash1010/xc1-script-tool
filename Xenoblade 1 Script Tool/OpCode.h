@@ -3,12 +3,12 @@
 
 class OpCode
 {
-	unsigned int opcodeVal;
-
-	static const std::string OpCodeStrings[96];
+	int opcodeVal;
 	static const unsigned int OperandSizes[96];
 
 public:
+    static const std::string OpCodeStrings[96];
+
 	OpCode(unsigned int opcodeVal);
 	OpCode(std::string opcode);
 	OpCode() = default;
@@ -114,6 +114,9 @@ public:
 
 	unsigned int getOperandSize();
 	std::string getOpCodeString();
-	unsigned int getOpCodeVal();
+	int getOpCodeVal();
+
+    static unsigned int getOperandSize(OpCode::OpCodes oc);
+    static unsigned int getOperandSize(std::string str);
 };
 

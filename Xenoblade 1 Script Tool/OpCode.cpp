@@ -202,6 +202,17 @@ const unsigned int OpCode::OperandSizes[] = {
     0, // BP
 };
 
+int stringToOpCode(std::string str) {
+    int opcodeVal = -1;
+    for (int i = 0; i < 96; i++) {
+        if (strcmp(OpCode::OpCodeStrings[i].c_str(), str.c_str())) {
+            return i;
+            break;
+        }
+    }
+    return opcodeVal;
+}
+
 OpCode::OpCode(unsigned int opcodeVal)
 {
 	this->opcodeVal = opcodeVal;
@@ -209,13 +220,7 @@ OpCode::OpCode(unsigned int opcodeVal)
 
 OpCode::OpCode(std::string opcodeString)
 {
-    this->opcodeVal = -1;
-    for (int i = 0; i < 96; i++) {
-        if (strcmp(OpCodeStrings[i].c_str(), opcodeString.c_str())) {
-            this->opcodeVal = i;
-            break;
-        }
-    }
+    this->opcodeVal = stringToOpCode(opcodeString);
     if (this->opcodeVal == -1) throw std::runtime_error(opcodeString + " is not a valid opcode");
 }
 
@@ -229,7 +234,19 @@ std::string OpCode::getOpCodeString()
     return OpCodeStrings[this->opcodeVal];
 }
 
-unsigned int OpCode::getOpCodeVal()
+int OpCode::getOpCodeVal()
 {
     return this->opcodeVal;
+}
+
+unsigned int OpCode::getOperandSize(OpCode::OpCodes oc)
+{
+    return OperandSizes[oc];
+}
+
+unsigned int OpCode::getOperandSize(std::string str)
+{
+    int opcodeVal = stringToOpCode(str);
+    if (opcodeVal == -1) throw std::runtime_error(str + " is not a valid opcode");
+    return opcodeVal;
 }
