@@ -13,15 +13,17 @@ private:
 	Type typeEnum;
 	bool inArray;
 	unsigned int length;
-	unsigned int value;
+	int value;
 	unsigned int field8; // only in 64-bit scripts, for pointer storage space
 
 public:
-	Object(Type type, bool inArray, unsigned int length, unsigned int value, unsigned int field8);
+	Object(Type typeEnum, bool inArray, unsigned int length, int value, unsigned int field8);
+	Object(std::string type, bool inArray, unsigned int length, int value, unsigned int field8);
 
 	std::string getType();
 	Type getTypeEnum();
-	unsigned int getLength(), getValue(), getField8();
+	unsigned int getLength(), getField8();
+	int getValue();
 	bool isInArray();
 };
 
