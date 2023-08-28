@@ -30,7 +30,7 @@ Tests::Tests(std::string scriptDirName, std::string outfileName) {
 
 		
 		// Instantiate Script object
-		Script script(inputScriptPath);
+		Script script(inputScriptPath, true);
 		std::cout << "Loaded " << inputScriptPath << '\n';
 		
 		// Generate output script
