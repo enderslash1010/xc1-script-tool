@@ -19,15 +19,19 @@ int main(int argc, char *argv[])
         if (argc != 4) printUsageStatement(argv[0]);
         else {
             if (strcmp(argv[1], "decompile") == 0) {
-                Script script(argv[2]);
+                Script script(argv[2], true);
                 script.generateOutfile(argv[3]);
+                std::cout << "Decompiled " << argv[2] << " to " << argv[3] << ".csv";
             }
             else if (strcmp(argv[1], "compile") == 0) {
-                std::cout << "unimplemented\n";
+                Script script(argv[2], false);
+                script.generateScriptFile(argv[3]);
+                std::cout << "Compiled " << argv[2] << " to " << argv[3] << ".sb";
             }
             else if (strcmp(argv[1], "test") == 0) {
                 std::cout << "Running Tests...\n";
                 Tests tests(argv[2], argv[3]);
+                std::cout << "Completed Tests";
             }
             else printUsageStatement(argv[0]);
         }
