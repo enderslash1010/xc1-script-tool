@@ -187,13 +187,23 @@ void Script::initCSV(std::string fileName) {
 	std::ifstream csvFile(fileName);
 	if (!csvFile.is_open()) throw std::runtime_error("Unable to open file " + fileName);
 	
-	// Read contents of file into vector or something
+	// Read contents of file into vector
 	std::vector<std::string> lines;
 	while (csvFile.good()) {
 		std::string str;
 		std::getline(csvFile, str, '\n');
 		lines.push_back(str);
 	}
+
+	// Read header
+	if (!std::regex_match(lines[0], std::regex("Header:(,*)"))) throw std::runtime_error("Missing \"Header\" Title");
+	if (!std::regex_match(lines[1], std::regex("Version,([0-9]+)(,*)"))) throw std::runtime_error("Invalid Version field");
+	if (!std::regex_match(lines[2], std::regex("Flags,([0-9]+)(,*)"))) throw std::runtime_error("Invalid Flags field");
+	if (!std::regex_match(lines[3], std::regex("isLoaded,([0-9]+)(,*)"))) throw std::runtime_error("Invalid isLoaded field");
+
+	this->version = std::stoi(split(lines[1])[1]);
+	this->flags = std::stoi(split(lines[2])[1]);
+	this->isLoaded = std::stoi(split(lines[3])[1]);
 
 	// Find Function Pool
 	int currIndex = -1;
@@ -861,6 +871,12 @@ void Script::encryptBytes(unsigned char* memblock, int start) {
 
 void Script::generateOutfile(std::string name) {
 	std::ofstream outfile(name + ".csv");
+
+	// Header
+	outfile << "Header:\n";
+	outfile << "Version," << (int)this->version << '\n';
+	outfile << "Flags," << (int)this->flags << '\n';
+	outfile << "isLoaded," << (int)this->isLoaded << "\n\n";
 
 	// Function Pool (with Local Pool and Code)
 	outfile << "Function Pool:" << '\n';
