@@ -181,7 +181,9 @@ std::vector<std::string> split(std::string str, std::string delim = ",") {
 }
 
 void Script::initCSV(std::string fileName) {
-	// TODO: make sure file has extension .csv
+	// Make sure file has extension .csv
+	std::size_t extension = fileName.find_last_of(".");
+	if (strcmp(".csv", fileName.substr(extension).c_str()) != 0) throw std::runtime_error("Expecting a .csv extension for input file " + fileName);
 	
 	// Open file
 	std::ifstream csvFile(fileName);
@@ -1135,7 +1137,7 @@ std::vector<unsigned char> Script::generateCodeSection() {
 		code.push_back(0x5E); // spacer for _main_
 	}
 
-	// TODO: get start and end offsets for each function, and use setStart/End()
+	// Get code from each function, and set start and end offsets for each function
 	for (int i = 1; i < this->functionPool.size(); i++) {
 		Function& f = this->functionPool.at(i);
 		std::vector<unsigned char> funcCode = f.getRawCode();
