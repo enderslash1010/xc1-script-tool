@@ -364,3 +364,6 @@ FodyWeavers.xsd
 /Xenoblade 1 Script Tool/4118.dat
 /Xenoblade 1 Script Tool/script.sb
 /Xenoblade 1 Script Tool/scripts
+*.sb
+*.csv
+*.csv#

@@ -42,11 +42,24 @@ class Script
 	void initSystemAttributePool(unsigned char* memblock);
 	void initUserAttributePool(unsigned char* memblock);
 
+	void initCSVFunctionPool(std::vector<std::string> lines, int& currIndex);
+	void initCSVIDPool(std::vector<std::string> lines, int& currIndex);
+	void initCSVIntPool(std::vector<std::string> lines, int& currIndex);
+	void initCSVFixedPool(std::vector<std::string> lines, int& currIndex);
+	void initCSVStringPool(std::vector<std::string> lines, int& currIndex);
+	void initCSVStaticVariables(std::vector<std::string> lines, int& currIndex);
+	void initCSVPluginImports(std::vector<std::string> lines, int& currIndex);
+	void initCSVOCImports(std::vector<std::string> lines, int& currIndex);
+	void initCSVSystemAttributes(std::vector<std::string> lines, int& currIndex);
+	void initCSVUserAttributes(std::vector<std::string> lines, int& currIndex);
+
 	void decryptBytes(unsigned char* memblock, int start);
 	void encryptBytes(unsigned char* memblock, int start);
 
 public:
-	Script(std::string fileName);
+	Script(std::string fileName, bool isScript);
+	void initScript(std::string fileName);
+	void initCSV(std::string fileName);
 	void generateOutfile(std::string name);
 	void generateScriptFile(std::string name);
 

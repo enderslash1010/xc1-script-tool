@@ -30,7 +30,7 @@ Tests::Tests(std::string scriptDirName, std::string outfileName) {
 
 		
 		// Instantiate Script object
-		Script script(inputScriptPath);
+		Script script(inputScriptPath, true);
 		std::cout << "Loaded " << inputScriptPath << '\n';
 		
 		// Generate output script
@@ -41,7 +41,7 @@ Tests::Tests(std::string scriptDirName, std::string outfileName) {
 
 		// Open both files
 		std::ifstream inputScript(inputScriptPath, std::ios::binary);
-		std::ifstream outputScript(outputScriptPath, std::ios::binary);
+		std::ifstream outputScript(outputScriptPath + ".sb", std::ios::binary);
 
 		// Iterate over output script to check for differences (since output script won't have the end padding...yet)
 		char outputData, inputData;

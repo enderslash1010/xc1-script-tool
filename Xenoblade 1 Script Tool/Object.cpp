@@ -1,8 +1,8 @@
 #include "Object.h"
 
-Object::Object(Object::Type type, bool inArray, unsigned int length, unsigned int value, unsigned int field8)
+Object::Object(Object::Type typeEnum, bool inArray, unsigned int length, int value, unsigned int field8)
 {
-	this->typeEnum = type;
+	this->typeEnum = typeEnum;
 	switch (this->typeEnum) {
 	case 0: this->type = "Null"; break;
 	case 1: this->type = "True"; break;
@@ -23,6 +23,28 @@ Object::Object(Object::Type type, bool inArray, unsigned int length, unsigned in
 	this->field8 = field8;
 }
 
+Object::Object(std::string type, bool inArray, unsigned int length, int value, unsigned int field8)
+{
+	this->type = type;
+	if (strcmp("Null", type.c_str()) == 0) this->typeEnum = Type::Null;
+	else if (strcmp("True", type.c_str()) == 0) this->typeEnum = Type::True;
+	else if (strcmp("False", type.c_str()) == 0) this->typeEnum = Type::False;
+	else if (strcmp("Int", type.c_str()) == 0) this->typeEnum = Type::Int;
+	else if (strcmp("Fixed", type.c_str()) == 0) this->typeEnum = Type::Fixed;
+	else if (strcmp("String", type.c_str()) == 0) this->typeEnum = Type::String;
+	else if (strcmp("Array", type.c_str()) == 0) this->typeEnum = Type::Array;
+	else if (strcmp("Function", type.c_str()) == 0) this->typeEnum = Type::Function;
+	else if (strcmp("Plugin", type.c_str()) == 0) this->typeEnum = Type::Plugin;
+	else if (strcmp("OC", type.c_str()) == 0) this->typeEnum = Type::OC;
+	else if (strcmp("Sys", type.c_str()) == 0) this->typeEnum = Type::Sys;
+
+	this->inArray = inArray;
+	this->length = length;
+	this->value = value;
+	this->field8 = field8;
+
+}
+
 std::string Object::getType()
 {
 	return this->type;
@@ -38,7 +60,7 @@ unsigned int Object::getLength()
 	return this->length;
 }
 
-unsigned int Object::getValue()
+int Object::getValue()
 {
 	return this->value;
 }
