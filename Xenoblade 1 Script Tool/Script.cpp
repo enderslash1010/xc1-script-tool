@@ -82,6 +82,10 @@ float Script::getFloat(unsigned char* memblock, int start) {
 
 Script::Script(std::string fileName, bool isScript) 
 {
+	// Check Endianness
+	int n = 1;
+	this->littleEndian = *(char*)&n == 1 ? true : false;
+
 	if (isScript) initScript(fileName);
 	else initCSV(fileName);
 }
@@ -99,10 +103,6 @@ void Script::initScript(std::string fileName) {
 
 	// Check file type
 	if (size < 63 || memblock[0x0] != 0x53 || memblock[0x1] != 0x42 || memblock[0x2] != 0x20 || memblock[0x3] != 0x20) throw std::runtime_error("Wrong file type");
-
-	// Check Endianness
-	int n = 1;
-	this->littleEndian = *(char*)&n == 1 ? true : false;
 
 	this->version = memblock[0x4];
 	//std::cout << "Version: 0x" << (int) this->version << '\n';
@@ -232,7 +232,7 @@ void Script::initCSVFunctionPool(std::vector<std::string> lines, int& currIndex)
 
 	while (true) {
 		if (std::regex_match(lines[currIndex], std::regex("ID Pool:(,*)"))) break; // Stop when next section (ID Pool) is reached
-		std::string functionName = lines[currIndex];
+		std::string functionName = split(lines[currIndex])[0];
 
 		if (!std::regex_match(lines[currIndex + 1], std::regex("Args,Field 4,Field 6,Field 10(,*)"))) throw std::runtime_error("Invalid attribute header for function " + functionName);
 		std::vector<std::string> argVals = split(lines[currIndex + 2]);
@@ -300,32 +300,50 @@ void Script::initCSVFunctionPool(std::vector<std::string> lines, int& currIndex)
 				// Make sure there are no other cases
 				if (lines.size() > currIndex && std::regex_match(lines[currIndex], std::regex(",,([^,]*,[^,]*)(.*)"))) throw std::runtime_error("SWITCH Instruction has more cases than specified (check that SWITCH operand = number of cases)");
 				currIndex--;
+
+				// Add to code
+				code.push_back(Instruction(OpCode::OpCodes::SWITCH, numCases, switchCases, defaultCase));
 			}
 			else { // Handle Non-SWITCH Instruction
 				switch (OpCode::getOperandSize(opcode)) {
 				case 0:
-					code.push_back(Instruction(opcode));
+					code.push_back(Instruction(OpCode::stringToOpCode(opcode)));
 					break;
 				case 1:
 				case 2:
 					if (instructionStr.size() < 2) throw std::runtime_error("Instruction " + opcode + " needs an operand");
-					code.push_back(Instruction(opcode, std::stoi(instructionStr[1])));
+					code.push_back(Instruction(OpCode::stringToOpCode(opcode), std::stoi(instructionStr[1])));
 					break;
 				}
 			}
 			currIndex++;
 		}
 
+		//for (Instruction i : code) std::cout << '\t' << i.getOpCode().getOpCodeString() << " " << i.getOperand() << '\n';
+
 		// Add function to this->functionPool, and add Local Pool to this->localPool if there is one
 		if (localPool.size() != 0) {
-			this->functionPool.push_back(Function(functionName, args, field4, field6, localPool, this->localPool.size(), field10, -1, -1)); // -1 are for attributes determined when generating a script
+			Function f(functionName, args, field4, field6, localPool, this->localPool.size(), field10, -1, -1); // -1 are for attributes determined when generating a script
+			f.addCode(code); // add code to function
+			this->functionPool.push_back(f);
 			this->localPool.push_back(localPool);
 		}
 		else {
-			this->functionPool.push_back(Function(functionName, args, field4, field6, localPool, 0xFFFF, field10, -1, -1)); // -1 are for attributes determined when generating a script
+			Function f(functionName, args, field4, field6, localPool, 0xFFFF, field10, -1, -1); // -1 are for attributes determined when generating a script
+			f.addCode(code); // add code to function
+			this->functionPool.push_back(f);
 		}
 		currIndex++;
 	}
+
+	/*
+	for (int i = 0; i < this->functionPool.size(); i++) {
+		Function f = this->functionPool[i];
+		std::cout << f.getName() << ": \n";
+		for (Instruction i : f.getCode()) std::cout << '\t' << i.getOpCode().getOpCodeString() << " " << i.getOperand() << '\n';
+		std::cout << '\n';
+	}
+	*/
 }
 
 void Script::initCSVIDPool(std::vector<std::string> lines, int& currIndex) {
@@ -376,9 +394,20 @@ void Script::initCSVStringPool(std::vector<std::string> lines, int& currIndex) {
 	if (!std::regex_match(lines[currIndex++], std::regex("Index,Value(,*)"))) throw std::runtime_error("Invalid String Pool header");
 	while (true) {
 		if (std::regex_match(lines[currIndex], std::regex("(,*)"))) break; // Check if it's the end of the section
-		std::vector<std::string> str = split(lines[currIndex]);
-		if (str.size() < 2) throw std::runtime_error("Invalid String Pool entry at index " + this->stringPool.size()); // Validate entry
-		this->stringPool.push_back(str[1]); // Push to this->stringPool
+		std::vector<std::string> strVec = split(lines[currIndex]);
+		if (strVec.size() < 2) throw std::runtime_error("Invalid String Pool entry at index " + this->stringPool.size()); // Validate entry
+
+		// the rest of the str vector contains more of the string if it has a "," in it, append them to make the entire string
+		std::string str = strVec[1];
+		if (str[0] == '"') str = str.substr(1); // Omit " if present at start
+		
+		for (int i = 2; i < strVec.size(); i++) {
+			if (strcmp("", strVec[i].c_str()) == 0) continue; // don't append empty string
+			str += "," + strVec[i];
+		}
+		if (str[str.size() - 1] == '"') str = str.substr(0, str.size() - 1); // Omit " if present at end
+
+		this->stringPool.push_back(str); // Push to this->stringPool
 		currIndex++; // Go to next String Pool entry
 	}
 	currIndex++; // Go to next section (Static variables)
@@ -914,7 +943,7 @@ void Script::generateOutfile(std::string name) {
 	// ID Pool
 	outfile << "ID Pool:\nIndex,Value\n";
 	for (int i = 0; i < this->IDPool.size(); i++) {
-		outfile << i << "," << this->IDPool.at(i) << '\n';
+		outfile << i << "," << this->IDPool.at(i) << "\n";
 	}
 	outfile << '\n';
 
@@ -935,7 +964,7 @@ void Script::generateOutfile(std::string name) {
 	// String Pool
 	outfile << "String Pool:\nIndex,Value\n";
 	for (int i = 0; i < this->stringPool.size(); i++) {
-		outfile << i << "," << this->stringPool.at(i) << '\n';
+		outfile << i << ",\"" << this->stringPool.at(i) << "\"\n";
 	}
 	outfile << '\n';
 
@@ -1097,23 +1126,31 @@ std::vector<unsigned char> Script::generateCodeSection() {
 
 	// Add _main_ function separately, since it's spacer values are different
 	code.push_back(0x5E); // spacer for _main_
-	std::vector<unsigned char> _main_ = this->functionPool.at(0).getRawCode();
+	Function& main = this->functionPool.at(0);
+	std::vector<unsigned char> _main_ = main.getRawCode();
 	if (_main_.size() != 0) {
+		main.setStart(code.size()); // Set Start
 		code.insert(code.end(), _main_.begin(), _main_.end());
+		main.setEnd(code.size()); // Set End
 		code.push_back(0x5E); // spacer for _main_
 	}
 
+	// TODO: get start and end offsets for each function, and use setStart/End()
 	for (int i = 1; i < this->functionPool.size(); i++) {
 		Function& f = this->functionPool.at(i);
 		std::vector<unsigned char> funcCode = f.getRawCode();
+		f.setStart(code.size()); // Set start
 		code.insert(code.end(), funcCode.begin(), funcCode.end());
+		f.setEnd(code.size()); // Set End
 		code.push_back(0x4B); // spacer
 	}
+
+	// Determine code size before padding
+	unsigned int codeSize = _main_.size() == 0 ? 1 : code.size();
+
 	while (code.size() % 4 != 0) code.push_back(0x0); // make sure code is aligned
 
 	// Add Section Header
-	unsigned int codeSize = _main_.size() == 0 ? 1 : code.size();
-
 	addValueToVectorStart(code, 4, codeSize); // Size of code in bytes
 	addValueToVectorStart(code, 4, 0); // Blank field
 	addValueToVectorStart(code, 4, 0xC); // Offset to code data, always 0xC since header is fixed size
@@ -1196,6 +1233,9 @@ std::vector<unsigned char> Script::generateStringSection(std::vector<std::string
 	addValueToVectorStart(stringPool, 4, offsetElementSize); // Size in bytes of elements in offset array
 	addValueToVectorStart(stringPool, 4, numStrings); // number of strings in section
 	addValueToVectorStart(stringPool, 4, 0xC); // Offset to code data, always 0xC since header is fixed size
+
+	// padding
+	while (stringPool.size() % 4 != 0) stringPool.push_back(0);
 
 	return stringPool;
 }
