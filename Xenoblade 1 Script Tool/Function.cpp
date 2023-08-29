@@ -20,6 +20,16 @@ void Function::addCode(std::vector<Instruction> code)
 	this->code = code;
 }
 
+void Function::setStart(int start)
+{
+	this->start = start;
+}
+
+void Function::setEnd(int end)
+{
+	this->end = end;
+}
+
 std::vector<Instruction> Function::getCode() 
 {
 	return this->code;
