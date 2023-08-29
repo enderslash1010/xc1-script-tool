@@ -4,10 +4,10 @@
 class OpCode
 {
 	int opcodeVal;
-	static const unsigned int OperandSizes[96];
 
 public:
     static const std::string OpCodeStrings[96];
+    static const unsigned int OperandSizes[96];
 
 	OpCode(unsigned int opcodeVal);
 	OpCode(std::string opcode);
@@ -111,6 +111,8 @@ public:
         EXIT,
         BP
     };
+
+    static int stringToOpCode(std::string str);
 
 	unsigned int getOperandSize();
 	std::string getOpCodeString();

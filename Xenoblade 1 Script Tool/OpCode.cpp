@@ -202,10 +202,10 @@ const unsigned int OpCode::OperandSizes[] = {
     0, // BP
 };
 
-int stringToOpCode(std::string str) {
+int OpCode::stringToOpCode(std::string str) {
     int opcodeVal = -1;
     for (int i = 0; i < 96; i++) {
-        if (strcmp(OpCode::OpCodeStrings[i].c_str(), str.c_str())) {
+        if (strcmp(OpCode::OpCodeStrings[i].c_str(), str.c_str()) == 0) {
             return i;
             break;
         }
@@ -248,5 +248,5 @@ unsigned int OpCode::getOperandSize(std::string str)
 {
     int opcodeVal = stringToOpCode(str);
     if (opcodeVal == -1) throw std::runtime_error(str + " is not a valid opcode");
-    return opcodeVal;
+    return OpCode::OperandSizes[opcodeVal];
 }
