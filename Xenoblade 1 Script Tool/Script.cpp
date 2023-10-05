@@ -115,58 +115,58 @@ void Script::initScript(std::string fileName) {
 	this->isLoaded = memblock[0x7];
 	//std::cout << std::hex << "isLoaded: 0x" << (int) this->isLoaded << '\n';
 
-	this->codeOffset = getUInteger4(memblock, 8);
-	//std::cout << std::hex << "Code Offset: 0x" << this->codeOffset << '\n';
+	unsigned int codeOffset = getUInteger4(memblock, 8);
+	//std::cout << std::hex << "Code Offset: 0x" << codeOffset << '\n';
 
-	this->IDPoolOffset = getUInteger4(memblock, 12);
-	//std::cout << std::hex << "ID Pool Offset: 0x" << this->IDPoolOffset << '\n';
+	unsigned int IDPoolOffset = getUInteger4(memblock, 12);
+	//std::cout << std::hex << "ID Pool Offset: 0x" << IDPoolOffset << '\n';
 
-	this->intPoolOffset = getUInteger4(memblock, 16);
-	//std::cout << std::hex << "Int Pool Offset: 0x" << this->intPoolOffset << '\n';
+	unsigned int intPoolOffset = getUInteger4(memblock, 16);
+	//std::cout << std::hex << "Int Pool Offset: 0x" << intPoolOffset << '\n';
 
-	this->fixedPoolOffset = getUInteger4(memblock, 20);
-	//std::cout << std::hex << "Fixed Pool Offset: 0x" << this->fixedPoolOffset << '\n';
+	unsigned int fixedPoolOffset = getUInteger4(memblock, 20);
+	//std::cout << std::hex << "Fixed Pool Offset: 0x" << fixedPoolOffset << '\n';
 
-	this->stringPoolOffset = getUInteger4(memblock, 24);
-	//std::cout << std::hex << "String Pool Offset: 0x" << this->stringPoolOffset << '\n';
+	unsigned int stringPoolOffset = getUInteger4(memblock, 24);
+	//std::cout << std::hex << "String Pool Offset: 0x" << stringPoolOffset << '\n';
 
-	this->functionPoolOffset = getUInteger4(memblock, 28);
-	//std::cout << std::hex << "Function Pool Offset: 0x" << this->functionPoolOffset << '\n';
+	unsigned int functionPoolOffset = getUInteger4(memblock, 28);
+	//std::cout << std::hex << "Function Pool Offset: 0x" << functionPoolOffset << '\n';
 
-	this->pluginImportsOffset = getUInteger4(memblock, 32);
-	//std::cout << std::hex << "Plugin Imports Offset: 0x" << this->pluginImportsOffset << '\n';
+	unsigned int pluginImportsOffset = getUInteger4(memblock, 32);
+	//std::cout << std::hex << "Plugin Imports Offset: 0x" << pluginImportsOffset << '\n';
 
-	this->OCImportsOffset = getUInteger4(memblock, 36);
-	//std::cout << std::hex << "OC Imports Offset: 0x" << this->OCImportsOffset << '\n';
+	unsigned int OCImportsOffset = getUInteger4(memblock, 36);
+	//std::cout << std::hex << "OC Imports Offset: 0x" << OCImportsOffset << '\n';
 
-	this->functionImportsOffset = getUInteger4(memblock, 40);
-	//std::cout << std::hex << "Function Imports Offset: 0x" << this->functionImportsOffset << '\n';
+	unsigned int functionImportsOffset = getUInteger4(memblock, 40);
+	//std::cout << std::hex << "Function Imports Offset: 0x" << functionImportsOffset << '\n';
 
-	this->staticVariablesOffset = getUInteger4(memblock, 44);
-	//std::cout << std::hex << "Static Variables Offset: 0x" << this->staticVariablesOffset << '\n';
+	unsigned int staticVariablesOffset = getUInteger4(memblock, 44);
+	//std::cout << std::hex << "Static Variables Offset: 0x" << staticVariablesOffset << '\n';
 
-	this->localPoolOffset = getUInteger4(memblock, 48);
-	//std::cout << std::hex << "Local Pool Offset: 0x" << this->localPoolOffset << '\n';
+	unsigned int localPoolOffset = getUInteger4(memblock, 48);
+	//std::cout << std::hex << "Local Pool Offset: 0x" << localPoolOffset << '\n';
 
-	this->systemAttributePoolOffset = getUInteger4(memblock, 52);
-	//std::cout << std::hex << "System Attribute Pool Offset: 0x" << this->systemAttributePoolOffset << '\n';
+	unsigned int systemAttributePoolOffset = getUInteger4(memblock, 52);
+	//std::cout << std::hex << "System Attribute Pool Offset: 0x" << systemAttributePoolOffset << '\n';
 
-	this->userAttributePoolOffset = getUInteger4(memblock, 56);
-	//std::cout << std::hex << "User Attribute Pool Offset: 0x" << this->userAttributePoolOffset << '\n';
+	unsigned int userAttributePoolOffset = getUInteger4(memblock, 56);
+	//std::cout << std::hex << "User Attribute Pool Offset: 0x" << userAttributePoolOffset << '\n';
 
-	initIDPool(memblock);
-	initIntPool(memblock);
-	initFixedPool(memblock);
-	initStringPool(memblock);
-	initLocalPool(memblock);
-	initFunctionPool(memblock);
-	initPluginImports(memblock);
-	initOCImports(memblock);
-	initFunctionImports(memblock);
-	initStaticVariables(memblock);
-	initSystemAttributePool(memblock);
-	initUserAttributePool(memblock);
-	initCode(memblock);
+	initIDPool(memblock, IDPoolOffset, intPoolOffset);
+	initIntPool(memblock, intPoolOffset);
+	initFixedPool(memblock, fixedPoolOffset);
+	initStringPool(memblock, stringPoolOffset, functionPoolOffset);
+	initLocalPool(memblock, localPoolOffset);
+	initFunctionPool(memblock, functionPoolOffset);
+	initPluginImports(memblock, pluginImportsOffset);
+	initOCImports(memblock, OCImportsOffset);
+	initFunctionImports(memblock, functionImportsOffset);
+	initStaticVariables(memblock, staticVariablesOffset);
+	initSystemAttributePool(memblock, systemAttributePoolOffset);
+	initUserAttributePool(memblock, userAttributePoolOffset);
+	initCode(memblock, codeOffset);
 }
 
 std::vector<std::string> split(std::string str, std::string delim = ",") {
@@ -485,11 +485,11 @@ void Script::initCSVUserAttributes(std::vector<std::string> lines, int& currInde
 	currIndex++; // Go to next section (User Attributes)
 }
 
-void Script::initCode(unsigned char *memblock) {
-	unsigned int dataOffset = getUInteger4(memblock, this->codeOffset);
-	unsigned int length = getUInteger4(memblock, this->codeOffset + 8);
+void Script::initCode(unsigned char *memblock, unsigned int codeOffset) {
+	unsigned int dataOffset = getUInteger4(memblock, codeOffset);
+	unsigned int length = getUInteger4(memblock, codeOffset + 8);
 
-	unsigned int codeStart = this->codeOffset + dataOffset;
+	unsigned int codeStart = codeOffset + dataOffset;
 
 	// Put instructions in a vector in each function object
 	for (Function &f : this->functionPool) {
@@ -552,12 +552,12 @@ void Script::initCode(unsigned char *memblock) {
 	
 }
 
-void Script::initIDPool(unsigned char* memblock) {
-	unsigned int dataOffset = getUInteger4(memblock, this->IDPoolOffset); // Array of offsets to strings relative to start of this array (this->IDPoolOffset)
-	unsigned int count = getUInteger4(memblock, this->IDPoolOffset + 4); // Number of strings in the section
-	unsigned int size = getUInteger4(memblock, this->IDPoolOffset + 8); // Size in bytes of elements in offset array
+void Script::initIDPool(unsigned char* memblock, unsigned int IDPoolOffset, unsigned int intPoolOffset) {
+	unsigned int dataOffset = getUInteger4(memblock, IDPoolOffset); // Array of offsets to strings relative to start of this array (this->IDPoolOffset)
+	unsigned int count = getUInteger4(memblock, IDPoolOffset + 4); // Number of strings in the section
+	unsigned int size = getUInteger4(memblock, IDPoolOffset + 8); // Size in bytes of elements in offset array
 	
-	unsigned int arrStart = dataOffset + this->IDPoolOffset; // start of array of offsets to string data
+	unsigned int arrStart = dataOffset + IDPoolOffset; // start of array of offsets to string data
 
 	// Get start offset of string data
 	unsigned int stringStart = 0; // start of strings
@@ -568,7 +568,7 @@ void Script::initIDPool(unsigned char* memblock) {
 	stringStart += arrStart;
 
 	// Decrypt string data
-	for (unsigned int i = stringStart; i < this->intPoolOffset; i+=4) {
+	for (unsigned int i = stringStart; i < intPoolOffset; i+=4) {
 		decryptBytes(memblock, i);
 	}
 
@@ -596,12 +596,12 @@ void Script::initIDPool(unsigned char* memblock) {
 	
 }
 
-void Script::initIntPool(unsigned char* memblock) {
-	unsigned int dataOffset = getUInteger4(memblock, this->intPoolOffset);
-	unsigned int count = getUInteger4(memblock, this->intPoolOffset + 4);
+void Script::initIntPool(unsigned char* memblock, unsigned int intPoolOffset) {
+	unsigned int dataOffset = getUInteger4(memblock, intPoolOffset);
+	unsigned int count = getUInteger4(memblock, intPoolOffset + 4);
 
 	// Represent each int in this->intPool
-	unsigned int pc = this->intPoolOffset + dataOffset; // go to data
+	unsigned int pc = intPoolOffset + dataOffset; // go to data
 	for (unsigned int i = 0; i < count; i++, pc+=4) {
 		this->intPool.push_back(getUInteger4(memblock, pc));
 	}
@@ -613,12 +613,12 @@ void Script::initIntPool(unsigned char* memblock) {
 	*/
 }
 
-void Script::initFixedPool(unsigned char* memblock) {
-	unsigned int dataOffset = getUInteger4(memblock, this->fixedPoolOffset);
-	unsigned int count = getUInteger4(memblock, this->fixedPoolOffset + 4);
+void Script::initFixedPool(unsigned char* memblock, unsigned int fixedPoolOffset) {
+	unsigned int dataOffset = getUInteger4(memblock, fixedPoolOffset);
+	unsigned int count = getUInteger4(memblock, fixedPoolOffset + 4);
 
 	// Represent each float in an attribute float array (this->fixedPool)
-	unsigned int pc = this->fixedPoolOffset + dataOffset;
+	unsigned int pc = fixedPoolOffset + dataOffset;
 	for (unsigned int i = 0; i < count; i++, pc+=4) {
 		this->fixedPool.push_back(getFloat(memblock, pc));
 	}
@@ -631,12 +631,12 @@ void Script::initFixedPool(unsigned char* memblock) {
 
 }
 
-void Script::initStringPool(unsigned char* memblock) {
-	unsigned int dataOffset = getUInteger4(memblock, this->stringPoolOffset); // Array of offsets to strings relative to start of this array (this->stringPoolOffset)
-	unsigned int count = getUInteger4(memblock, this->stringPoolOffset + 4); // Number of strings in the section
-	unsigned int size = getUInteger4(memblock, this->stringPoolOffset + 8); // Size in bytes of elements in offset array
+void Script::initStringPool(unsigned char* memblock, unsigned int stringPoolOffset, unsigned int functionPoolOffset) {
+	unsigned int dataOffset = getUInteger4(memblock, stringPoolOffset); // Array of offsets to strings relative to start of this array (this->stringPoolOffset)
+	unsigned int count = getUInteger4(memblock, stringPoolOffset + 4); // Number of strings in the section
+	unsigned int size = getUInteger4(memblock, stringPoolOffset + 8); // Size in bytes of elements in offset array
 
-	unsigned int arrStart = dataOffset + this->stringPoolOffset; // start of array of offsets to string data
+	unsigned int arrStart = dataOffset + stringPoolOffset; // start of array of offsets to string data
 
 	// Get start offset of string data
 	unsigned int stringStart = 0; // start of strings
@@ -647,7 +647,7 @@ void Script::initStringPool(unsigned char* memblock) {
 	stringStart += arrStart;
 
 	// Decrypt string data
-	for (unsigned int i = stringStart; i < this->functionPoolOffset; i += 4) {
+	for (unsigned int i = stringStart; i < functionPoolOffset; i += 4) {
 		decryptBytes(memblock, i);
 	}
 
@@ -675,12 +675,12 @@ void Script::initStringPool(unsigned char* memblock) {
 
 }
 
-void Script::initFunctionPool(unsigned char* memblock) {
-	unsigned int dataOffset = getUInteger4(memblock, this->functionPoolOffset);
-	unsigned int count = getUInteger4(memblock, this->functionPoolOffset + 4);
-	unsigned int size = getUInteger4(memblock, this->functionPoolOffset + 8);
+void Script::initFunctionPool(unsigned char* memblock, unsigned int functionPoolOffset) {
+	unsigned int dataOffset = getUInteger4(memblock, functionPoolOffset);
+	unsigned int count = getUInteger4(memblock, functionPoolOffset + 4);
+	unsigned int size = getUInteger4(memblock, functionPoolOffset + 8);
 
-	unsigned int pc = this->functionPoolOffset + dataOffset;
+	unsigned int pc = functionPoolOffset + dataOffset;
 
 	// Represent functions in a function array
 	for (unsigned int i = 0; i < count; i++, pc += size) {
@@ -702,12 +702,12 @@ void Script::initFunctionPool(unsigned char* memblock) {
 	// for (Function f : this->functionPool) std::cout << f.getName() << ": " << f.getStart() << ", " << f.getEnd() << '\n';
 }
 
-void Script::initPluginImports(unsigned char* memblock) {
-	unsigned int dataOffset = getUInteger4(memblock, this->pluginImportsOffset);
-	unsigned int count = getUInteger4(memblock, this->pluginImportsOffset + 4);
-	unsigned int size = getUInteger4(memblock, this->pluginImportsOffset + 8);
+void Script::initPluginImports(unsigned char* memblock, unsigned int pluginImportsOffset) {
+	unsigned int dataOffset = getUInteger4(memblock, pluginImportsOffset);
+	unsigned int count = getUInteger4(memblock, pluginImportsOffset + 4);
+	unsigned int size = getUInteger4(memblock, pluginImportsOffset + 8);
 
-	unsigned int pc = this->pluginImportsOffset + dataOffset;
+	unsigned int pc = pluginImportsOffset + dataOffset;
 
 	// Represent plugin import in a PluginImport array
 	for (unsigned int i = 0; i < count; i++, pc += size) {
@@ -721,12 +721,12 @@ void Script::initPluginImports(unsigned char* memblock) {
 
 }
 
-void Script::initOCImports(unsigned char* memblock) {
-	unsigned int dataOffset = getUInteger4(memblock, this->OCImportsOffset);
-	unsigned int count = getUInteger4(memblock, this->OCImportsOffset + 4);
-	unsigned int size = getUInteger4(memblock, this->OCImportsOffset + 8);
+void Script::initOCImports(unsigned char* memblock, unsigned int OCImportsOffset) {
+	unsigned int dataOffset = getUInteger4(memblock, OCImportsOffset);
+	unsigned int count = getUInteger4(memblock, OCImportsOffset + 4);
+	unsigned int size = getUInteger4(memblock, OCImportsOffset + 8);
 
-	unsigned int pc = this->OCImportsOffset + dataOffset;
+	unsigned int pc = OCImportsOffset + dataOffset;
 
 	// Represent imported OC name IDs in an attribute array
 	for (unsigned int i = 0; i < count; i++, pc += size) {
@@ -738,19 +738,19 @@ void Script::initOCImports(unsigned char* memblock) {
 
 }
 
-void Script::initFunctionImports(unsigned char* memblock) {
-	unsigned int dataOffset = getUInteger4(memblock, this->functionImportsOffset);
-	unsigned int count = getUInteger4(memblock, this->functionImportsOffset + 4);
-	unsigned int size = getUInteger4(memblock, this->functionImportsOffset + 8);
+void Script::initFunctionImports(unsigned char* memblock, unsigned int functionImportsOffset) {
+	unsigned int dataOffset = getUInteger4(memblock, functionImportsOffset);
+	unsigned int count = getUInteger4(memblock, functionImportsOffset + 4);
+	unsigned int size = getUInteger4(memblock, functionImportsOffset + 8);
 
 	// Note: xc1 doesn't use function imports in any of it's scripts, so we don't know how function imports are stored (most likely as indexes in ID Pool)
 }
 
-void Script::initStaticVariables(unsigned char* memblock) {
-	unsigned int dataOffset = getUInteger4(memblock, this->staticVariablesOffset);
-	unsigned int count = getUInteger4(memblock, this->staticVariablesOffset + 4);
+void Script::initStaticVariables(unsigned char* memblock, unsigned int staticVariablesOffset) {
+	unsigned int dataOffset = getUInteger4(memblock, staticVariablesOffset);
+	unsigned int count = getUInteger4(memblock, staticVariablesOffset + 4);
 
-	unsigned int pc = this->staticVariablesOffset + dataOffset;
+	unsigned int pc = staticVariablesOffset + dataOffset;
 
 	// represent static objects in an attribute array
 	for (unsigned int i = 0; i < count; i++) {
@@ -775,12 +775,12 @@ void Script::initStaticVariables(unsigned char* memblock) {
 
 }
 
-void Script::initLocalPool(unsigned char* memblock) {
-	unsigned int dataOffset = getUInteger4(memblock, this->localPoolOffset);
-	unsigned int count = getUInteger4(memblock, this->localPoolOffset + 4);
-	unsigned int size = getUInteger4(memblock, this->localPoolOffset + 8);
+void Script::initLocalPool(unsigned char* memblock, unsigned int localPoolOffset) {
+	unsigned int dataOffset = getUInteger4(memblock, localPoolOffset);
+	unsigned int count = getUInteger4(memblock, localPoolOffset + 4);
+	unsigned int size = getUInteger4(memblock, localPoolOffset + 8);
 
-	unsigned int pc = this->localPoolOffset + dataOffset;
+	unsigned int pc = localPoolOffset + dataOffset;
 	unsigned int arrStart = pc;
 
 	// Get all offsets to function stack data
@@ -830,12 +830,12 @@ void Script::initLocalPool(unsigned char* memblock) {
 
 }
 
-void Script::initSystemAttributePool(unsigned char* memblock) {
-	unsigned int dataOffset = getUInteger4(memblock, this->systemAttributePoolOffset);
-	unsigned int count = getUInteger4(memblock, this->systemAttributePoolOffset + 4);
-	unsigned int size = getUInteger4(memblock, this->systemAttributePoolOffset + 8);
+void Script::initSystemAttributePool(unsigned char* memblock, unsigned int systemAttributePoolOffset) {
+	unsigned int dataOffset = getUInteger4(memblock, systemAttributePoolOffset);
+	unsigned int count = getUInteger4(memblock, systemAttributePoolOffset + 4);
+	unsigned int size = getUInteger4(memblock, systemAttributePoolOffset + 8);
 
-	unsigned int pc = this->systemAttributePoolOffset + dataOffset;
+	unsigned int pc = systemAttributePoolOffset + dataOffset;
 
 	// represent system attributes in an attribute array
 	for (unsigned int i = 0; i < count; i++, pc += size) {
@@ -853,12 +853,12 @@ void Script::initSystemAttributePool(unsigned char* memblock) {
 
 }
 
-void Script::initUserAttributePool(unsigned char* memblock) {
-	unsigned int dataOffset = getUInteger4(memblock, this->userAttributePoolOffset);
-	unsigned int count = getUInteger4(memblock, this->userAttributePoolOffset + 4);
-	unsigned int size = getUInteger4(memblock, this->userAttributePoolOffset + 8);
+void Script::initUserAttributePool(unsigned char* memblock, unsigned int userAttributePoolOffset) {
+	unsigned int dataOffset = getUInteger4(memblock, userAttributePoolOffset);
+	unsigned int count = getUInteger4(memblock, userAttributePoolOffset + 4);
+	unsigned int size = getUInteger4(memblock, userAttributePoolOffset + 8);
 
-	unsigned int pc = this->userAttributePoolOffset + dataOffset;
+	unsigned int pc = userAttributePoolOffset + dataOffset;
 
 	// represent user attributes in an attribute array
 	// Note: xc1 doesn't use user attributes in any of it's scripts
